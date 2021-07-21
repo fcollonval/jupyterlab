@@ -23,7 +23,7 @@ export class VariableMimeRenderer extends MainAreaWidget<Panel> {
     dataLoader
       .then(async data => {
         if (data.data) {
-          const mimeType = rendermime.preferredMimeType(data.data);
+          const mimeType = rendermime.preferredMimeType(data.data, 'any');
 
           if (mimeType) {
             const widget = rendermime.createRenderer(mimeType);
