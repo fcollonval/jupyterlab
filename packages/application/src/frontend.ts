@@ -50,7 +50,8 @@ export abstract class JupyterFrontEnd<
     // render context menu/submenus with inline svg icon tweaks
     this.contextMenu = new ContextMenuSvg({
       commands: this.commands,
-      renderer: options.contextMenuRenderer
+      renderer: options.contextMenuRenderer,
+      sortBySelector: false
     });
 
     // The default restored promise if one does not exist in the options.
