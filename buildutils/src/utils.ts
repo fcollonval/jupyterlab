@@ -313,6 +313,10 @@ export function getPackageGraph(): DepGraph<Dict<unknown>> {
   return graph;
 }
 
+function isModuleDir(current: string, moduleDirs: string[]): boolean {
+  return moduleDirs.some(dir => current.endsWith(dir));
+}
+
 /**
  * Resolve a `package.json` in the `module` starting at resolution from the `parentModule`.
  *
@@ -328,10 +332,33 @@ function requirePackage(parentModule: string, module: string): NodeRequire {
   } catch {
     return require(packagePath);
   }
-  const requirePath = require.resolve(packagePath, {
-    paths: [parentModulePath]
-  });
-  return require(requirePath);
+
+  try {
+    // This may fail for package not exporting `package.json` in their exports map
+    // https://github.com/nodejs/node/issues/33460
+    const requirePath = require.resolve(packagePath, {
+      paths: [parentModulePath]
+    });
+    return require(requirePath);
+  } catch {
+    // If it fails, try to find the package.json by going parent to parent
+    // Inspired by https://github.com/rollup/plugins/blob/540767b947cfad0dd06a278b977b8ce05da9593c/packages/node-resolve/src/package/utils.js#L11
+    const base = require.resolve(module, {
+      paths: [parentModulePath]
+    });
+    const { root } = path.parse(base);
+    let current = base;
+
+    while (current !== root && !isModuleDir(current, [parentModulePath])) {
+      const pkgJsonPath = path.join(current, 'package.json');
+      if (fs.existsSync(pkgJsonPath)) {
+        return require(pkgJsonPath);
+      }
+      current = path.resolve(current, '..');
+    }
+  }
+
+  throw new Error(`Unable to find package.json for '${module}'.`);
 }
 
 /**
