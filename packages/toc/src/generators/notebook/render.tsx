@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { INotebookTracker, NotebookActions } from '@jupyterlab/notebook';
-import { ellipsesIcon } from '@jupyterlab/ui-components';
+import { circleIcon, ellipsesIcon } from '@jupyterlab/ui-components';
 import { MARKDOWN_HEADING_COLLAPSED } from '@jupyterlab/cells';
 import { INotebookHeading } from '../../utils/headings';
 import { sanitizerOptions } from '../../utils/sanitizer_options';
@@ -78,6 +78,13 @@ function render(
             <ellipsesIcon.react />
           </div>
         ) : (
+          <div className="toc-Ellipses" />
+        );
+        let runningIndicator = item.running ? (
+          <div className="toc-Running">
+            <circleIcon.react />
+          </div>
+        ) : (
           <div />
         );
 
@@ -96,7 +103,10 @@ function render(
           >
             {button}
             {jsx}
-            {ellipseButton}
+            <div className="toc-Indicators">
+              {runningIndicator}
+              {ellipseButton}
+            </div>
           </div>
         );
       }
@@ -140,6 +150,13 @@ function render(
         ) : (
           <div />
         );
+        let runningIndicator = item.running ? (
+          <div className="toc-Running">
+            <circleIcon.react />
+          </div>
+        ) : (
+          <div />
+        );
         jsx = (
           <div
             className={
@@ -154,6 +171,7 @@ function render(
           >
             {button}
             {jsx}
+            {runningIndicator}
             {ellipseButton}
           </div>
         );

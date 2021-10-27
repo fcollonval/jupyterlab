@@ -56,7 +56,8 @@ function getCodeCellHeading(
       prompt: executionCount,
       cellRef: cellRef,
       hasChild: false,
-      index: index
+      index: index,
+      running: false
     });
   }
   return headings[0];

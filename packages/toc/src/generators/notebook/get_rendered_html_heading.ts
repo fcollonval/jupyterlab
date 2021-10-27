@@ -66,7 +66,8 @@ function getRenderedHTMLHeadings(
           type: 'markdown',
           cellRef: cellRef,
           hasChild: false,
-          index: index
+          index: index,
+          running: false
         });
       }
       continue;
@@ -97,7 +98,8 @@ function getRenderedHTMLHeadings(
       type: 'header',
       cellRef: cellRef,
       hasChild: false,
-      index: index
+      index: index,
+      running: false
     });
   }
   return headings;

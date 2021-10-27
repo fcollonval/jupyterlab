@@ -10,7 +10,11 @@ import {
   MARKDOWN_HEADING_COLLAPSED,
   MarkdownCell
 } from '@jupyterlab/cells';
-import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
+import {
+  INotebookTracker,
+  NotebookActions,
+  NotebookPanel
+} from '@jupyterlab/notebook';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 import { TableOfContentsRegistry as Registry } from '../../registry';
 import { TableOfContents } from '../../toc';
@@ -62,6 +66,11 @@ function createNotebookGenerator(
     sanitizer: sanitizer,
     translator: translator || nullTranslator
   });
+  // removes potential running metadata left over from previous session
+  const panel = tracker.currentWidget;
+  panel?.content.widgets.forEach(cell => {
+    cell.model.metadata.delete('running');
+  });
   if (settings) {
     settings.changed.connect(() => {
       options.numberingH1 = settings.composite.numberingH1 as boolean;
@@ -75,6 +84,12 @@ function createNotebookGenerator(
       widget.update();
     }
   );
+  NotebookActions.executionScheduled.connect((_, args) => {
+    args.cell.model.metadata.set('running', true);
+  });
+  NotebookActions.executed.connect((_, args) => {
+    args.cell.model.metadata.delete('running');
+  });
   return {
     tracker,
     usesLatex: true,
@@ -124,6 +139,7 @@ function createNotebookGenerator(
 
     // Generate headings by iterating through all notebook cells...
     for (let i = 0; i < panel.content.widgets.length; i++) {
+      let running: boolean = false;
       let cell: Cell = panel.content.widgets[i];
       let model = cell.model;
       let cellCollapseMetadata = options.syncCollapseState
@@ -131,6 +147,12 @@ function createNotebookGenerator(
         : 'toc-hr-collapsed';
       let collapsed = model.metadata.get(cellCollapseMetadata) as boolean;
       collapsed = collapsed || false;
+      running = (model.metadata.get('running') as boolean) || running || false;
+      if (running) {
+        if (i > 0) {
+          headings[headings.length - 1].running = true;
+        }
+      }
 
       if (model.type === 'code') {
         if (!widget || (widget && options.showCode)) {

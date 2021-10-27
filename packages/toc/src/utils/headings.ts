@@ -81,6 +81,11 @@ interface INotebookHeading extends INumberedHeading {
    * index of reference cell in the notebook
    */
   index: number;
+
+  /**
+   * Boolean indicating whether a heading has a running cell under it
+   */
+  running: boolean;
 }
 
 /**

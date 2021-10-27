@@ -54,6 +54,7 @@ function getMarkdownHeadings(
         type: 'header',
         cellRef: cellRef,
         hasChild: false,
+        running: false,
         index
       });
     } else {
@@ -64,6 +65,7 @@ function getMarkdownHeadings(
         type: 'markdown',
         cellRef: cellRef,
         hasChild: false,
+        running: false,
         index
       });
     }
