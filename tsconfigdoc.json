@@ -239,6 +239,9 @@
       "path": "./packages/statusbar-extension"
     },
     {
+      "path": "./packages/tabmanager-extension"
+    },
+    {
       "path": "./packages/terminal"
     },
     {
