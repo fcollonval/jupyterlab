@@ -66,11 +66,6 @@ function createNotebookGenerator(
     sanitizer: sanitizer,
     translator: translator || nullTranslator
   });
-  // removes potential running metadata left over from previous session
-  const panel = tracker.currentWidget;
-  panel?.content.widgets.forEach(cell => {
-    cell.model.metadata.delete('running');
-  });
   if (settings) {
     settings.changed.connect(() => {
       options.numberingH1 = settings.composite.numberingH1 as boolean;
