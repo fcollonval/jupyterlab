@@ -8,6 +8,7 @@ import { ISignal, Signal } from '@lumino/signaling';
 import { TableOfContentsRegistry as Registry } from '../../registry';
 import { TableOfContents } from '../../toc';
 import { TagsToolComponent } from './tagstool';
+import { Cell } from '@jupyterlab/cells';
 
 /**
  * Interface describing constructor options.
@@ -45,6 +46,11 @@ interface IOptions {
    * The application language translator.
    */
   translator?: ITranslator;
+
+  /**
+   * Array to keep track of currently running cells.
+   */
+  running?: [Cell];
 }
 
 /**
@@ -75,6 +81,7 @@ class OptionsManager extends Registry.IOptionsManager {
     this._notebook = notebook;
     this.sanitizer = options.sanitizer;
     this.storeTags = [];
+    this.running = [];
     this.translator = options.translator || nullTranslator;
     this._collapseChanged = new Signal<this, Registry.ICollapseChangedArgs>(
       this
@@ -301,6 +308,7 @@ class OptionsManager extends Registry.IOptionsManager {
   private _tagTool: TagsToolComponent | null = null;
   translator: ITranslator; // FIXME-TRANS:
   public storeTags: string[];
+  public running: Cell[];
 }
 
 /**

@@ -85,10 +85,16 @@ function createNotebookGenerator(
     }
   );
   NotebookActions.executionScheduled.connect((_, args) => {
-    args.cell.model.metadata.set('running', true);
+    if (!options.running.includes(args.cell)) {
+      options.running.push(args.cell);
+    }
   });
   NotebookActions.executed.connect((_, args) => {
-    args.cell.model.metadata.delete('running');
+    options.running.forEach((cell, index) => {
+      if (cell === args.cell) {
+        options.running.splice(index, 1);
+      }
+    });
   });
   return {
     tracker,
@@ -139,7 +145,6 @@ function createNotebookGenerator(
 
     // Generate headings by iterating through all notebook cells...
     for (let i = 0; i < panel.content.widgets.length; i++) {
-      let running: boolean = false;
       let cell: Cell = panel.content.widgets[i];
       let model = cell.model;
       let cellCollapseMetadata = options.syncCollapseState
@@ -147,7 +152,7 @@ function createNotebookGenerator(
         : 'toc-hr-collapsed';
       let collapsed = model.metadata.get(cellCollapseMetadata) as boolean;
       collapsed = collapsed || false;
-      running = (model.metadata.get('running') as boolean) || running || false;
+      let running = options.running.includes(cell);
       if (running) {
         if (i > 0) {
           headings[headings.length - 1].running = true;
