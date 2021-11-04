@@ -31,11 +31,13 @@ import { OptionsManager } from './options_manager';
 import { render } from './render';
 import { toolbar } from './toolbar_generator';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { ISignal } from '@lumino/signaling';
+import { RunningStatus } from '../../utils/headings';
+import { TableOfContentsRegistry } from '../../registry';
 
 /**
  * Returns a ToC generator for notebooks.
  *
- * @private
  * @param tracker - notebook tracker
  * @param widget - table of contents widget
  * @param sanitizer - HTML sanitizer
@@ -43,94 +45,121 @@ import { ISettingRegistry } from '@jupyterlab/settingregistry';
  * @param settings - advanced settings for toc extension
  * @returns ToC generator capable of parsing notebooks
  */
-function createNotebookGenerator(
+export function createNotebookGenerator(
   tracker: INotebookTracker,
   widget: TableOfContents,
   sanitizer: ISanitizer,
   translator?: ITranslator,
   settings?: ISettingRegistry.ISettings
 ): Registry.IGenerator<NotebookPanel> {
-  let numberingH1 = true;
-  let includeOutput = true;
-  let syncCollapseState = false;
-  if (settings) {
-    numberingH1 = settings.composite.numberingH1 as boolean;
-    includeOutput = settings.composite.includeOutput as boolean;
-    syncCollapseState = settings.composite.syncCollapseState as boolean;
-  }
-  const options = new OptionsManager(widget, tracker, {
-    numbering: false,
-    numberingH1: numberingH1,
-    includeOutput: includeOutput,
-    syncCollapseState: syncCollapseState,
-    sanitizer: sanitizer,
-    translator: translator || nullTranslator
-  });
-  if (settings) {
-    settings.changed.connect(() => {
-      options.numberingH1 = settings.composite.numberingH1 as boolean;
-      options.includeOutput = settings.composite.includeOutput as boolean;
-      options.syncCollapseState = settings.composite
-        .syncCollapseState as boolean;
-    });
-  }
-  tracker.activeCellChanged.connect(
-    (sender: INotebookTracker, args: Cell<ICellModel>) => {
-      widget.update();
-    }
+  return new NotebookGenerator(
+    tracker,
+    widget,
+    sanitizer,
+    translator,
+    settings
   );
-  NotebookActions.executionScheduled.connect((_, args) => {
-    if (!options.running.includes(args.cell)) {
-      options.running.push(args.cell);
+}
+
+class NotebookGenerator implements Registry.IGenerator<NotebookPanel> {
+  constructor(
+    tracker: INotebookTracker,
+    widget: TableOfContents,
+    sanitizer: ISanitizer,
+    translator?: ITranslator,
+    settings?: ISettingRegistry.ISettings
+  ) {
+    this.sanitizer = sanitizer;
+    this.tracker = tracker;
+    this._runningCells = new Array<Cell>();
+
+    let numberingH1 = true;
+    let includeOutput = true;
+    let syncCollapseState = false;
+    if (settings) {
+      numberingH1 = settings.composite.numberingH1 as boolean;
+      includeOutput = settings.composite.includeOutput as boolean;
+      syncCollapseState = settings.composite.syncCollapseState as boolean;
     }
-  });
-  NotebookActions.executed.connect((_, args) => {
-    options.running.forEach((cell, index) => {
-      if (cell === args.cell) {
-        options.running.splice(index, 1);
+    const options = (this.options = new OptionsManager(widget, tracker, {
+      numbering: false,
+      numberingH1: numberingH1,
+      includeOutput: includeOutput,
+      syncCollapseState: syncCollapseState,
+      sanitizer: sanitizer,
+      translator: translator || nullTranslator
+    }));
+    if (settings) {
+      settings.changed.connect(() => {
+        options.numberingH1 = settings.composite.numberingH1 as boolean;
+        options.includeOutput = settings.composite.includeOutput as boolean;
+        options.syncCollapseState = settings.composite
+          .syncCollapseState as boolean;
+      });
+    }
+    tracker.activeCellChanged.connect(
+      (sender: INotebookTracker, args: Cell<ICellModel>) => {
+        widget.update();
+      }
+    );
+    NotebookActions.executionScheduled.connect((_, args) => {
+      if (!this._runningCells.includes(args.cell)) {
+        this._runningCells.push(args.cell);
       }
     });
-  });
-  return {
-    tracker,
-    usesLatex: true,
-    options: options,
-    toolbarGenerator: generateToolbar,
-    itemRenderer: renderItem,
-    generate: generate,
-    collapseChanged: options.collapseChanged
-  };
+    NotebookActions.executed.connect((_, args) => {
+      this._runningCells.forEach((cell, index) => {
+        if (cell === args.cell) {
+          this._runningCells.splice(index, 1);
+        }
+      });
+    });
+  }
+
+  readonly usesLatex: true;
+  readonly options: OptionsManager;
+  readonly sanitizer: ISanitizer;
+  readonly tracker: INotebookTracker;
+  protected readonly widget: TableOfContents;
+  private _runningCells: Cell[];
+
+  get collapseChanged(): ISignal<
+    TableOfContentsRegistry.IOptionsManager,
+    TableOfContentsRegistry.ICollapseChangedArgs
+  > {
+    return this.options.collapseChanged;
+  }
 
   /**
    * Returns a toolbar generator.
    *
-   * @private
    * @returns toolbar generator
    */
-  function generateToolbar() {
-    return toolbar(options, tracker);
+  toolbarGenerator() {
+    return toolbar(this.options, this.tracker);
   }
 
   /**
    * Renders a table of contents item.
    *
-   * @private
    * @param item - heading to render
    * @param toc - list of all headers to render
    * @returns rendered item
    */
-  function renderItem(item: INotebookHeading, toc: INotebookHeading[] = []) {
-    return render(options, tracker, item, toc);
-  }
+  itemRenderer = (
+    item: INotebookHeading,
+    toc: INotebookHeading[] = []
+  ): JSX.Element | null => {
+    return render(this.options, this.tracker, item, toc);
+  };
 
   /**
    * Generates a table of contents.
    *
-   * @private
    * @param panel - notebook widget
    * @returns a list of headings
    */
-  function generate(panel: NotebookPanel): INotebookHeading[] {
+  generate(panel: NotebookPanel): INotebookHeading[] {
     let headings: INotebookHeading[] = [];
     let collapseLevel = -1;
     let dict = {};
@@ -142,45 +171,50 @@ function createNotebookGenerator(
     for (let i = 0; i < panel.content.widgets.length; i++) {
       let cell: Cell = panel.content.widgets[i];
       let model = cell.model;
-      let cellCollapseMetadata = options.syncCollapseState
+      let cellCollapseMetadata = this.options.syncCollapseState
         ? MARKDOWN_HEADING_COLLAPSED
         : 'toc-hr-collapsed';
-      let collapsed = model.metadata.get(cellCollapseMetadata) as boolean;
-      collapsed = collapsed || false;
-      let running = options.running.includes(cell);
-      if (running) {
-        if (i > 0) {
-          headings[headings.length - 1].running = true;
-        }
-      }
+      const collapsed =
+        (model.metadata.get(cellCollapseMetadata) as boolean) ?? false;
+
+      const isRunning = this._runningCells.includes(cell)
+        ? this._runningCells[0] === cell
+          ? RunningStatus.Running
+          : RunningStatus.Scheduled
+        : RunningStatus.Idle;
 
       if (model.type === 'code') {
-        if (!widget || (widget && options.showCode)) {
+        if (!this.widget || (this.widget && this.options.showCode)) {
           const onClick = (line: number) => {
             return () => {
               panel.content.activeCellIndex = i;
               cell.node.scrollIntoView();
             };
           };
-          let count = (cell as CodeCell).model.executionCount as number | null;
-          let executionCount = count !== null ? '[' + count + ']: ' : '[ ]: ';
+          const count = (cell as CodeCell).model.executionCount as
+            | number
+            | null;
+          const executionIndicator =
+            count ?? (isRunning !== RunningStatus.Idle ? '*' : ' ');
+          let executionCount = `[${executionIndicator}]: `;
           let heading = getCodeCellHeading(
             (model as CodeCellModel).value.text,
             onClick,
             executionCount,
             getLastHeadingLevel(headings),
             cell,
-            i
+            i,
+            isRunning
           );
           [headings, prev] = appendHeading(
             headings,
             heading,
             prev,
             collapseLevel,
-            options.filtered
+            this.options.filtered
           );
         }
-        if (options.includeOutput) {
+        if (this.options.includeOutput) {
           // Iterate over the code cell outputs to check for Markdown or HTML from which we can generate ToC headings...
           for (let j = 0; j < (model as CodeCellModel).outputs.length; j++) {
             const m = (model as CodeCellModel).outputs.get(j);
@@ -200,13 +234,14 @@ function createNotebookGenerator(
             let htmlHeadings = getRenderedHTMLHeadings(
               (cell as CodeCell).outputArea.widgets[j].node,
               onClick,
-              sanitizer,
+              this.sanitizer,
               dict,
               getLastHeadingLevel(headings),
-              options.numbering,
-              options.numberingH1,
+              this.options.numbering,
+              this.options.numberingH1,
               cell,
-              i
+              i,
+              isRunning
             );
             for (const heading of htmlHeadings) {
               [headings, prev, collapseLevel] = appendMarkdownHeading(
@@ -214,9 +249,9 @@ function createNotebookGenerator(
                 headings,
                 prev,
                 collapseLevel,
-                options.filtered,
+                this.options.filtered,
                 collapsed,
-                options.showMarkdown,
+                this.options.showMarkdown,
                 cellCollapseMetadata
               );
             }
@@ -246,13 +281,14 @@ function createNotebookGenerator(
           const htmlHeadings = getRenderedHTMLHeadings(
             cell.node,
             onClick,
-            sanitizer,
+            this.sanitizer,
             dict,
             lastLevel,
-            options.numbering,
-            options.numberingH1,
+            this.options.numbering,
+            this.options.numberingH1,
             cell,
-            i
+            i,
+            isRunning
           );
           for (heading of htmlHeadings) {
             [headings, prev, collapseLevel] = appendMarkdownHeading(
@@ -260,9 +296,9 @@ function createNotebookGenerator(
               headings,
               prev,
               collapseLevel,
-              options.filtered,
+              this.options.filtered,
               collapsed,
-              options.showMarkdown,
+              this.options.showMarkdown,
               cellCollapseMetadata
             );
           }
@@ -280,7 +316,8 @@ function createNotebookGenerator(
             dict,
             lastLevel,
             cell,
-            i
+            i,
+            isRunning
           );
           for (heading of markdownHeadings) {
             [headings, prev, collapseLevel] = appendMarkdownHeading(
@@ -288,9 +325,9 @@ function createNotebookGenerator(
               headings,
               prev,
               collapseLevel,
-              options.filtered,
+              this.options.filtered,
               collapsed,
-              options.showMarkdown,
+              this.options.showMarkdown,
               cellCollapseMetadata
             );
           }
@@ -300,8 +337,3 @@ function createNotebookGenerator(
     return headings;
   }
 }
-
-/**
- * Exports.
- */
-export { createNotebookGenerator };

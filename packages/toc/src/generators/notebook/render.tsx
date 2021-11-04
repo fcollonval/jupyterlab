@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { INotebookTracker, NotebookActions } from '@jupyterlab/notebook';
-import { circleIcon, ellipsesIcon } from '@jupyterlab/ui-components';
+import { classes, ellipsesIcon } from '@jupyterlab/ui-components';
 import { MARKDOWN_HEADING_COLLAPSED } from '@jupyterlab/cells';
 import { INotebookHeading } from '../../utils/headings';
 import { sanitizerOptions } from '../../utils/sanitizer_options';
@@ -13,112 +13,44 @@ import { OptionsManager } from './options_manager';
 /**
  * Renders a notebook table of contents item.
  *
- * @private
  * @param options - generator options
  * @param tracker - notebook tracker
  * @param item - notebook heading
  * @param toc - current list of notebook headings
  * @returns rendered item
  */
-function render(
+export function render(
   options: OptionsManager,
   tracker: INotebookTracker,
   item: INotebookHeading,
   toc: INotebookHeading[] = []
 ): JSX.Element | null {
-  let jsx;
   if (item.type === 'markdown' || item.type === 'header') {
-    let fontSizeClass = 'toc-level-size-default';
-    let numbering = item.numbering && options.numbering ? item.numbering : '';
-    let cellCollapseMetadata = options.syncCollapseState
+    const fontSizeClass =
+      item.type === 'header'
+        ? `toc-level-size-${item.level}`
+        : 'toc-level-size-default';
+    const numbering = item.numbering && options.numbering ? item.numbering : '';
+    const cellCollapseMetadata = options.syncCollapseState
       ? MARKDOWN_HEADING_COLLAPSED
       : 'toc-hr-collapsed';
-    if (item.type === 'header') {
-      fontSizeClass = 'toc-level-size-' + item.level;
-    }
-    if (item.html && (item.type === 'header' || options.showMarkdown)) {
-      jsx = (
+
+    if (item.type === 'header' || options.showMarkdown) {
+      const header = item.html ? (
         <span
           dangerouslySetInnerHTML={{
             __html:
               numbering +
               options.sanitizer.sanitize(item.html, sanitizerOptions)
           }}
-          className={item.type + '-cell toc-cell-item'}
+          className={`${item.type}-cell toc-cell-item`}
         />
-      );
-      // Render the headers:
-      if (item.type === 'header') {
-        let button = (
-          <div
-            className="jp-Collapser p-Widget lm-Widget"
-            onClick={(event: any) => {
-              event.stopPropagation();
-              onClick(tracker, cellCollapseMetadata, item);
-            }}
-          >
-            <div className="toc-Collapser-child" />
-          </div>
-        );
-
-        let collapsed;
-        if (item.cellRef!.model.metadata.has(cellCollapseMetadata)) {
-          collapsed = item.cellRef!.model.metadata.get(
-            cellCollapseMetadata
-          ) as boolean;
-        }
-        let ellipseButton = collapsed ? (
-          <div
-            className="toc-Ellipses"
-            onClick={(event: any) => {
-              event.stopPropagation();
-              onClick(tracker, cellCollapseMetadata, item);
-            }}
-          >
-            <ellipsesIcon.react />
-          </div>
-        ) : (
-          <div className="toc-Ellipses" />
-        );
-        let runningIndicator = item.running ? (
-          <div className="toc-Running">
-            <circleIcon.react />
-          </div>
-        ) : (
-          <div />
-        );
-
-        // Render the heading item:
-        jsx = (
-          <div
-            className={
-              'toc-entry-holder ' +
-              fontSizeClass +
-              (tracker.activeCell === item.cellRef
-                ? ' toc-active-cell'
-                : previousHeader(tracker, item, toc)
-                ? ' toc-active-cell'
-                : '')
-            }
-          >
-            {button}
-            {jsx}
-            <div className="toc-Indicators">
-              {runningIndicator}
-              {ellipseButton}
-            </div>
-          </div>
-        );
-      }
-      return jsx;
-    }
-    if (item.type === 'header' || options.showMarkdown) {
-      // Render headers/markdown for plain text:
-      jsx = (
-        <span className={item.type + '-cell toc-cell-item'}>
+      ) : (
+        <span className={`${item.type}-cell toc-cell-item`}>
           {numbering + item.text}
         </span>
       );
+
       if (item.type === 'header') {
         let button = (
           <div
@@ -131,6 +63,7 @@ function render(
             <div className="toc-Collapser-child" />
           </div>
         );
+
         let collapsed;
         if (item.cellRef!.model.metadata.has(cellCollapseMetadata)) {
           collapsed = item.cellRef!.model.metadata.get(
@@ -147,40 +80,32 @@ function render(
           >
             <ellipsesIcon.react />
           </div>
-        ) : (
-          <div />
-        );
-        let runningIndicator = item.running ? (
-          <div className="toc-Running">
-            <circleIcon.react />
-          </div>
-        ) : (
-          <div />
-        );
-        jsx = (
+        ) : null;
+
+        return (
           <div
-            className={
-              'toc-entry-holder ' +
-              fontSizeClass +
-              (tracker.activeCell === item.cellRef
-                ? ' toc-active-cell'
-                : previousHeader(tracker, item, toc)
-                ? ' toc-active-cell'
-                : '')
-            }
+            className={classes(
+              'toc-entry-holder',
+              fontSizeClass,
+              tracker.activeCell === item.cellRef ||
+                previousHeader(tracker, item, toc)
+                ? 'toc-active-cell'
+                : ''
+            )}
+            data-running={item.isRunning}
           >
             {button}
-            {jsx}
-            {runningIndicator}
+            {header}
             {ellipseButton}
           </div>
         );
+      } else {
+        return header;
       }
-      return jsx;
     }
-    return null;
   }
-  if (item.type === 'code' && options.showCode) {
+
+  if (options.showCode && item.type === 'code') {
     // Render code cells:
     return (
       <div className="toc-code-cell-div">
@@ -191,6 +116,7 @@ function render(
       </div>
     );
   }
+
   return null;
 
   /**
@@ -273,8 +199,3 @@ function previousHeader(
   }
   return false;
 }
-
-/**
- * Exports.
- */
-export { render };
