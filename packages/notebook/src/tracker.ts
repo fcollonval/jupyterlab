@@ -4,6 +4,7 @@
 import { WidgetTracker } from '@jupyterlab/apputils';
 import { Cell } from '@jupyterlab/cells';
 import { ISignal, Signal } from '@lumino/signaling';
+import { NotebookViewModel } from '.';
 import { NotebookPanel } from './panel';
 import { INotebookTracker } from './tokens';
 import { Notebook } from './widget';
@@ -82,9 +83,9 @@ export class NotebookTracker
     this._activeCellChanged.emit(widget.content.activeCell || null);
   }
 
-  private _onActiveCellChanged(sender: Notebook, cell: Cell): void {
+  private _onActiveCellChanged(sender: NotebookViewModel, cell: Cell): void {
     // Check if the active cell change happened for the current notebook.
-    if (this.currentWidget && this.currentWidget.content === sender) {
+    if (this.currentWidget && this.currentWidget.content.viewModel === sender) {
       this._activeCell = cell || null;
       this._activeCellChanged.emit(this._activeCell);
     }

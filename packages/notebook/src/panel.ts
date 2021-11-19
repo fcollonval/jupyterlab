@@ -33,7 +33,7 @@ const NOTEBOOK_PANEL_NOTEBOOK_CLASS = 'jp-NotebookPanel-notebook';
 /**
  * The class name to add when the document is loaded for the search box.
  */
-const SEARCH_DOCUMENT_LOADED_CLASS = 'jp-DocumentSearch-document-loaded';
+// const SEARCH_DOCUMENT_LOADED_CLASS = 'jp-DocumentSearch-document-loaded';
 
 /**
  * A widget that hosts a notebook toolbar and content area.
@@ -57,7 +57,7 @@ export class NotebookPanel extends DocumentWidget<Notebook, INotebookModel> {
     this.content.addClass(NOTEBOOK_PANEL_NOTEBOOK_CLASS);
 
     // Set up things related to the context
-    this.content.model = this.context.model;
+    this.content.viewModel.model = this.context.model;
     this.context.sessionContext.kernelChanged.connect(
       this._onKernelChanged,
       this
@@ -66,7 +66,8 @@ export class NotebookPanel extends DocumentWidget<Notebook, INotebookModel> {
       this._onSessionStatusChanged,
       this
     );
-    this.content.fullyRendered.connect(this._onFullyRendered, this);
+    // TODO
+    // this.content.fullyRendered.connect(this._onFullyRendered, this);
     this.context.saveState.connect(this._onSave, this);
     void this.revealed.then(() => {
       if (this.isDisposed) {
@@ -123,8 +124,8 @@ export class NotebookPanel extends DocumentWidget<Notebook, INotebookModel> {
    * @param config new options to set
    */
   setConfig(config: NotebookPanel.IConfig): void {
-    this.content.editorConfig = config.editorConfig;
-    this.content.notebookConfig = config.notebookConfig;
+    this.content.viewModel.editorConfig = config.editorConfig;
+    this.content.viewModel.notebookConfig = config.notebookConfig;
     // Update kernel shutdown behavior
     const kernelPreference = this.context.sessionContext.kernelPreference;
     this.context.sessionContext.kernelPreference = {
@@ -172,12 +173,14 @@ export class NotebookPanel extends DocumentWidget<Notebook, INotebookModel> {
 
   /**
    * Handle a fully rendered signal notebook.
+   *
+   * TODO
    */
-  private _onFullyRendered(notebook: Notebook, fullyRendered: boolean): void {
-    fullyRendered
-      ? this.removeClass(SEARCH_DOCUMENT_LOADED_CLASS)
-      : this.addClass(SEARCH_DOCUMENT_LOADED_CLASS);
-  }
+  // private _onFullyRendered(notebook: Notebook, fullyRendered: boolean): void {
+  //   fullyRendered
+  //     ? this.removeClass(SEARCH_DOCUMENT_LOADED_CLASS)
+  //     : this.addClass(SEARCH_DOCUMENT_LOADED_CLASS);
+  // }
 
   /**
    * Handle a change in the kernel by updating the document metadata.

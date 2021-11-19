@@ -167,7 +167,7 @@ export namespace NBTestUtils {
   export function populateNotebook(notebook: Notebook): void {
     const model = new NotebookModel();
     model.fromJSON(DEFAULT_CONTENT);
-    notebook.model = model;
+    notebook.viewModel.model = model;
   }
 
   export function createNotebookWidgetFactory(

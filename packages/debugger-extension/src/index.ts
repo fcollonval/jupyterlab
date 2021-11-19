@@ -434,7 +434,7 @@ const variables: JupyterFrontEndPlugin<void> = {
         const activeWidget = handler.activeWidget;
         let activeRendermime =
           activeWidget instanceof NotebookPanel
-            ? activeWidget.content.rendermime
+            ? activeWidget.content.viewModel.rendermime
             : rendermime;
 
         if (!activeRendermime) {

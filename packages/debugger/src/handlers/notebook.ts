@@ -5,7 +5,7 @@ import { Cell, CodeCell } from '@jupyterlab/cells';
 
 import { IObservableMap, ObservableMap } from '@jupyterlab/observables';
 
-import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
+import { NotebookPanel, NotebookViewModel } from '@jupyterlab/notebook';
 
 import { IDisposable } from '@lumino/disposable';
 
@@ -91,8 +91,8 @@ export class NotebookHandler implements IDisposable {
    * @param notebook The notebook for which the active cell has changed.
    * @param cell The new active cell.
    */
-  private _onActiveCellChanged(notebook: Notebook, cell: Cell): void {
-    if (this._notebookPanel.content !== notebook) {
+  private _onActiveCellChanged(notebook: NotebookViewModel, cell: Cell): void {
+    if (this._notebookPanel.content.viewModel !== notebook) {
       return;
     }
     this._addEditorHandler(cell);

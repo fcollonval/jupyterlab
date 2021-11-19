@@ -26,8 +26,8 @@ import { IDocumentWidget } from '@jupyterlab/docregistry';
 import { FileEditor, IEditorTracker } from '@jupyterlab/fileeditor';
 import {
   INotebookTracker,
-  Notebook,
-  NotebookPanel
+  NotebookPanel,
+  NotebookViewModel
 } from '@jupyterlab/notebook';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import {
@@ -237,7 +237,7 @@ export const lineColItem: JupyterFrontEndPlugin<void> = {
   ) => {
     const item = new LineCol(translator);
 
-    const onActiveCellChanged = (notebook: Notebook, cell: Cell) => {
+    const onActiveCellChanged = (notebook: NotebookViewModel, cell: Cell) => {
       item.model!.editor = cell && cell.editor;
     };
 

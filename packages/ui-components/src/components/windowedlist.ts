@@ -77,7 +77,9 @@ try {
   v Turn off windowing
   - Scroll after end
   - onScroll vs intersection observer
-  - Check is size cache based on mapping per node HTML a good idea? May cost too much to retrieve the size?
+  v Check is size cache based on mapping per node HTML a good idea? May cost too much to retrieve the size?
+    WeakMap is a bad idea
+  - Test drag and drop
  */
 
 export interface IWindowedListModel extends IDisposable {
@@ -129,6 +131,16 @@ export interface IWindowedListModel extends IDisposable {
   estimateWidgetHeight: (index: number | null) => number;
 
   /**
+   * VariableSizeList caches offsets and measurements for each index for performance purposes. This method clears that cached data for all items after (and including) the specified index. It should be called whenever a item's size changes. (Note that this is not a typical occurrance.)
+   *
+   * By default the list will automatically re-render after the index is reset. If you would like to delay this re-render until e.g. a state update has completed in the parent component, specify a value of false for the second, optional parameter.
+   *
+   * @param index
+   * @param shouldForceUpdate
+   */
+  resetAfterIndex(index: number, shouldForceUpdate?: boolean): void;
+
+  /**
    * A signal emitted when any model state changes.
    *
    * TODO do we need to provide a change arg (probably to deal with invalidate cache)
@@ -140,7 +152,7 @@ export interface IWindowedListModel extends IDisposable {
     IChangedArgs<
       any,
       any,
-      'count' | 'data' | 'overscanCount' | 'windowingActive'
+      'count' | 'data' | 'overscanCount' | 'windowingActive' | string
     >
   >;
 }
@@ -246,6 +258,19 @@ export abstract class WindowedListModel implements IWindowedListModel {
   abstract estimateWidgetHeight: (index: number | null) => number;
 
   /**
+   * VariableSizeList caches offsets and measurements for each index for performance purposes. This method clears that cached data for all items after (and including) the specified index. It should be called whenever a item's size changes. (Note that this is not a typical occurrance.)
+   *
+   * By default the list will automatically re-render after the index is reset. If you would like to delay this re-render until e.g. a state update has completed in the parent component, specify a value of false for the second, optional parameter.
+   *
+   * @param index
+   * @param shouldForceUpdate
+   */
+  resetAfterIndex(index: number, shouldForceUpdate: boolean = true): void {
+    // TODO
+    this.stateChanged.emit({ name: 'data', newValue: null, oldValue: null });
+  }
+
+  /**
    * A signal emitted when any model state changes.
    */
   readonly stateChanged = new Signal<
@@ -253,7 +278,7 @@ export abstract class WindowedListModel implements IWindowedListModel {
     IChangedArgs<
       any,
       any,
-      'count' | 'data' | 'overscanCount' | 'windowingActive'
+      'count' | 'data' | 'overscanCount' | 'windowingActive' | string
     >
   >(this);
 
@@ -277,10 +302,12 @@ export namespace IWindowedListModel {
   }
 }
 
-export class WindowedList extends Widget {
+export class WindowedList<
+  T extends IWindowedListModel = IWindowedListModel
+> extends Widget {
   static readonly DEFAULT_WIDGET_SIZE = 50;
 
-  constructor(options: WindowedList.IOptions) {
+  constructor(options: WindowedList.IOptions<T>) {
     // TODO probably needs to be able to customize outer HTML tag (could be ul / ol / table, ...)
     const node = document.createElement('div');
     node.className = 'jp-WindowedPanel-outer';
@@ -773,7 +800,7 @@ export class WindowedList extends Widget {
     this.update();
   }
 
-  protected _model: IWindowedListModel;
+  protected _model: T;
   private _height: number;
   private _innerElement: HTMLDivElement;
   private _windowElement: HTMLDivElement;
@@ -916,8 +943,8 @@ export class WindowedLayout extends PanelLayout {
 }
 
 export namespace WindowedList {
-  export interface IOptions {
-    model: IWindowedListModel;
+  export interface IOptions<T extends IWindowedListModel = IWindowedListModel> {
+    model: T;
     layout?: WindowedLayout;
   }
 

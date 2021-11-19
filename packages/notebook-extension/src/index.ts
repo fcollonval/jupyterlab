@@ -56,6 +56,7 @@ import {
   NotebookTools,
   NotebookTracker,
   NotebookTrustStatus,
+  NotebookViewModel,
   NotebookWidgetFactory,
   StaticNotebook,
   ToolbarItems
@@ -1539,8 +1540,8 @@ function addCommands(
         }
       );
       panel.content.activeCellChanged.connect(
-        (notebook: Notebook, cell: Cell) => {
-          NotebookActions.expandParent(cell, notebook);
+        (notebook: NotebookViewModel, cell: Cell) => {
+          NotebookActions.expandParent(cell, panel.content);
         }
       );
     }
@@ -2649,7 +2650,7 @@ function populateMenus(
       NotebookActions.toggleAllLineNumbers(widget.content);
     },
     lineNumbersToggled: widget => {
-      const config = widget.content.editorConfig;
+      const config = widget.content.viewModel.editorConfig;
       return !!(
         config.code.lineNumbers &&
         config.markdown.lineNumbers &&

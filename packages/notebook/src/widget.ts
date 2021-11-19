@@ -3,7 +3,6 @@
 
 import {
   Cell,
-  CellModel,
   CodeCell,
   ICellModel,
   ICodeCellModel,
@@ -18,8 +17,15 @@ import * as nbformat from '@jupyterlab/nbformat';
 import { IObservableList, IObservableMap } from '@jupyterlab/observables';
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
-import { WindowedListModel } from '@jupyterlab/ui-components';
-import { ArrayExt, each, findIndex } from '@lumino/algorithm';
+import { WindowedList, WindowedListModel } from '@jupyterlab/ui-components';
+import {
+  ArrayExt,
+  each,
+  filter,
+  findIndex,
+  map,
+  toArray
+} from '@lumino/algorithm';
 import { MimeData, ReadonlyPartialJSONValue } from '@lumino/coreutils';
 import { ElementExt } from '@lumino/domutils';
 import { Drag, IDragEvent } from '@lumino/dragdrop';
@@ -183,12 +189,15 @@ export class NotebookViewModel extends WindowedListModel {
       options.notebookConfig || StaticNotebook.defaultNotebookConfig;
     this._mimetypeService = options.mimeTypeService;
   }
+
   estimateWidgetHeight = (index: number | null): number => {
     // TODO
     return 120;
   };
 
   widgetRenderer = (index: number): Widget => {
+    const cell = this._model!.cells.get(index);
+
     let widget: Cell;
     switch (cell.type) {
       case 'code':
@@ -210,6 +219,17 @@ export class NotebookViewModel extends WindowedListModel {
   };
 
   /**
+   * A signal emitted when the active cell changes.
+   *
+   * #### Notes
+   * This can be due to the active index changing or the
+   * cell at the active index changing.
+   */
+  get activeCellChanged(): ISignal<NotebookViewModel, Cell> {
+    return this._activeCellChanged;
+  }
+
+  /**
    * A signal emitted when the model of the notebook changes.
    */
   get modelChanged(): ISignal<this, void> {
@@ -224,6 +244,83 @@ export class NotebookViewModel extends WindowedListModel {
    */
   get modelContentChanged(): ISignal<this, void> {
     return this._modelContentChanged;
+  }
+
+  /**
+   * A signal emitted when the selection state of the notebook changes.
+   */
+  get selectionChanged(): ISignal<NotebookViewModel, number[]> {
+    return this._selectionChanged;
+  }
+
+  /**
+   * The active cell index of the notebook.
+   *
+   * #### Notes
+   * The index will be clamped to the bounds of the notebook cells.
+   */
+  get activeCellIndex(): number {
+    if (!this.model) {
+      return -1;
+    }
+    return this.model.cells.length ? this._activeCellIndex : -1;
+  }
+  set activeCellIndex(newValue: number) {
+    const oldValue = this._activeCellIndex;
+    if (!this.model || !this.model.cells.length) {
+      newValue = -1;
+    } else {
+      newValue = Math.max(newValue, 0);
+      newValue = Math.min(newValue, this.model.cells.length - 1);
+    }
+
+    if (this._activeCellIndex !== newValue) {
+      this._activeCellIndex = newValue;
+      this.stateChanged.emit({ name: 'activeCellIndex', oldValue, newValue });
+    }
+
+    // TODO
+    // const cell = this.widgets[newValue];
+    // if (cell !== this._activeCell) {
+    //   // Post an update request.
+    //   this.update();
+    //   this._activeCell = cell;
+    //   this._activeCellChanged.emit(cell);
+    // }
+    // if (this.mode === 'edit' && cell instanceof MarkdownCell) {
+    //   cell.rendered = false;
+    // }
+    // this._ensureFocus();
+    // if (newValue === oldValue) {
+    //   return;
+    // }
+    // this._trimSelections();
+  }
+
+  get selectedCellIndexes(): number[] {
+    return this._selectedCells;
+  }
+  set selectedCellIndexes(index: number[]) {
+    index = index ?? [];
+    if (!Array.isArray(index)) {
+      index = [index];
+    }
+
+    if (!ArrayExt.shallowEqual(this._selectedCells, index)) {
+      this._selectedCells = index;
+      this._selectionChanged.emit(this._selectedCells);
+    }
+  }
+
+  /**
+   * Get the active cell widget.
+   *
+   * #### Notes
+   * This is a cell or `null` if there is no active cell.
+   */
+  get activeCell(): Cell | null {
+    const activeCellModel = this._model?.cells.get(this._activeCellIndex);
+    return (activeCellModel && this._widgetsCache.get(activeCellModel)) ?? null;
   }
 
   /**
@@ -307,6 +404,21 @@ export class NotebookViewModel extends WindowedListModel {
   }
 
   /**
+   * A read-only sequence of the widgets in the notebook.
+   */
+  get widgets(): ReadonlyArray<Cell> {
+    // TODO should not be needed
+    return toArray(
+      filter(
+        map(this.model?.cells.iter() ?? [], cell =>
+          this._widgetsCache.get(cell)
+        ),
+        c => !!c
+      )
+    ) as Cell[];
+  }
+
+  /**
    * Dispose of the resources held by the widget.
    */
   dispose(): void {
@@ -341,6 +453,33 @@ export class NotebookViewModel extends WindowedListModel {
    */
   protected onModelContentChanged(model: INotebookModel, args: void): void {
     this._modelContentChanged.emit(void 0);
+  }
+
+  /**
+   * Handle a cell being inserted.
+   *
+   * The default implementation is a no-op
+   */
+  protected onCellInserted(index: number, cell: Cell): void {
+    // This is a no-op.
+  }
+
+  /**
+   * Handle a cell being moved.
+   *
+   * The default implementation is a no-op
+   */
+  protected onCellMoved(fromIndex: number, toIndex: number): void {
+    // This is a no-op.
+  }
+
+  /**
+   * Handle a cell being removed.
+   *
+   * The default implementation is a no-op
+   */
+  protected onCellRemoved(index: number, cell: Cell): void {
+    // This is a no-op.
   }
 
   /**
@@ -383,10 +522,13 @@ export class NotebookViewModel extends WindowedListModel {
     }
     if (!newValue) {
       this._mimetype = 'text/plain';
+      this.widgetCount = 0;
       return;
     }
+
     this._updateMimetype();
     const cells = newValue.cells;
+    // TODO this should happen in the model...
     if (!cells.length && newValue.isInitialized) {
       cells.push(
         newValue.contentFactory.createCell(this.notebookConfig.defaultCell, {})
@@ -397,7 +539,8 @@ export class NotebookViewModel extends WindowedListModel {
     newValue.contentChanged.connect(this.onModelContentChanged, this);
     newValue.metadata.changed.connect(this.onMetadataChanged, this);
 
-    this.stateChanged.emit({ name: 'data', newValue, oldValue });
+    // Trigger state change
+    this.widgetCount = newValue.cells.length;
   }
 
   /**
@@ -407,55 +550,90 @@ export class NotebookViewModel extends WindowedListModel {
     sender: IObservableList<ICellModel>,
     args: IObservableList.IChangedArgs<ICellModel>
   ) {
-    let index = 0;
+    /* TODO
+       - Create an active / selection cell model and deal with it
+       - Move adding an empty cell if the notebook cell list is empty in the notebook model
+       - Quid on the callback onCellInserted / Removed / Moved
+     */
     switch (args.type) {
       case 'add':
-        index = args.newIndex;
-        // eslint-disable-next-line no-case-declarations
-        const insertType: InsertType = args.oldIndex == -1 ? 'push' : 'insert';
-        each(args.newValues, value => {
-          this._insertCell(index++, value, insertType);
-        });
+        // TODO should we change to resetFromIndex to avoid all -1
+        this.resetAfterIndex(args.newIndex - 1, false);
+        this.widgetCount += 1;
         break;
       case 'move':
-        this._moveCell(args.oldIndex, args.newIndex);
+        this.resetAfterIndex(Math.min(args.newIndex - 1, args.oldIndex - 1));
         break;
       case 'remove':
-        each(args.oldValues, value => {
-          this._removeCell(args.oldIndex);
-        });
-        // Add default cell if there are no cells remaining.
-        if (!sender.length) {
-          const model = this.model;
-          // Add the cell in a new context to avoid triggering another
-          // cell changed event during the handling of this signal.
-          requestAnimationFrame(() => {
-            if (model && !model.isDisposed && !model.cells.length) {
-              model.cells.push(
-                model.contentFactory.createCell(
-                  this.notebookConfig.defaultCell,
-                  {}
-                )
-              );
-            }
-          });
-        }
+        this.resetAfterIndex(args.oldIndex - 1, false);
+        this.widgetCount -= 1;
+        // TODO should we add a cell in the model if the list is emptied
+        //       // Add the cell in a new context to avoid triggering another
+        //       // cell changed event during the handling of this signal.
+        //       requestAnimationFrame(() => {
+        //         if (model && !model.isDisposed && !model.cells.length) {
+        //           model.cells.push(
+        //             model.contentFactory.createCell(
+        //               this.notebookConfig.defaultCell,
+        //               {}
+        //             )
+        //           );
+        //         }
+        //       });
         break;
       case 'set':
-        // TODO: reuse existing widgets if possible.
-        index = args.newIndex;
-        each(args.newValues, value => {
-          // Note: this ordering (insert then remove)
-          // is important for getting the active cell
-          // index for the editable notebook correct.
-          this._insertCell(index, value, 'set');
-          this._removeCell(index + 1);
-          index++;
-        });
+        this.resetAfterIndex(args.newIndex - 1);
         break;
-      default:
-        return;
     }
+    // let index = 0;
+    // switch (args.type) {
+    //   case 'add':
+    //     index = args.newIndex;
+    //     // eslint-disable-next-line no-case-declarations
+    //     const insertType: InsertType = args.oldIndex == -1 ? 'push' : 'insert';
+    //     each(args.newValues, value => {
+    //       this._insertCell(index++, value, insertType);
+    //     });
+    //     break;
+    //   case 'move':
+    //     this._moveCell(args.oldIndex, args.newIndex);
+    //     break;
+    //   case 'remove':
+    //     each(args.oldValues, value => {
+    //       this._removeCell(args.oldIndex);
+    //     });
+    //     // Add default cell if there are no cells remaining.
+    //     if (!sender.length) {
+    //       const model = this.model;
+    //       // Add the cell in a new context to avoid triggering another
+    //       // cell changed event during the handling of this signal.
+    //       requestAnimationFrame(() => {
+    //         if (model && !model.isDisposed && !model.cells.length) {
+    //           model.cells.push(
+    //             model.contentFactory.createCell(
+    //               this.notebookConfig.defaultCell,
+    //               {}
+    //             )
+    //           );
+    //         }
+    //       });
+    //     }
+    //     break;
+    //   case 'set':
+    //     // TODO: reuse existing widgets if possible.
+    //     index = args.newIndex;
+    //     each(args.newValues, value => {
+    //       // Note: this ordering (insert then remove)
+    //       // is important for getting the active cell
+    //       // index for the editable notebook correct.
+    //       this._insertCell(index, value, 'set');
+    //       this._removeCell(index + 1);
+    //       index++;
+    //     });
+    //     break;
+    //   default:
+    //     return;
+    // }
   }
 
   /**
@@ -596,6 +774,73 @@ export class NotebookViewModel extends WindowedListModel {
   private _modelChanged = new Signal<this, void>(this);
   private _modelContentChanged = new Signal<this, void>(this);
   private _widgetsCache = new WeakMap<ICellModel, Cell>();
+
+  // Attributes for selection
+  private _activeCellIndex = -1;
+  private _selectedCells = new Array<number>();
+  private _activeCellChanged = new Signal<NotebookViewModel, Cell>(this);
+  private _selectionChanged = new Signal<NotebookViewModel, number[]>(this);
+}
+
+export class StaticNotebook extends WindowedList<NotebookViewModel> {
+  /**
+   * Construct a notebook widget.
+   */
+  constructor(options: StaticNotebook.IOptions) {
+    super({ model: new NotebookViewModel(options) });
+    this.addClass(NB_CLASS);
+    this.node.dataset[KERNEL_USER] = 'true';
+    this.node.dataset[UNDOER] = 'true';
+    this.node.dataset[CODE_RUNNER] = 'true';
+  }
+
+  /**
+   * The model for the widget.
+   */
+  get model(): INotebookModel | null {
+    return this._model.model;
+  }
+
+  get viewModel(): NotebookViewModel {
+    return this._model;
+  }
+
+  // /**
+  //  * Get the mimetype for code cells.
+  //  */
+  // get codeMimetype(): string {
+  //   return this._mimetype;
+  // }
+
+  /**
+   * A read-only sequence of the widgets in the notebook.
+   */
+  get widgets(): ReadonlyArray<Cell> {
+    // TODO fix selection logic
+    return this._model.widgets;
+  }
+
+  // /**
+  //  * A configuration object for cell editor settings.
+  //  */
+  // get editorConfig(): StaticNotebook.IEditorConfig {
+  //   return this._editorConfig;
+  // }
+  // set editorConfig(value: StaticNotebook.IEditorConfig) {
+  //   this._editorConfig = value;
+  //   this._updateEditorConfig();
+  // }
+
+  // /**
+  //  * A configuration object for notebook settings.
+  //  */
+  // get notebookConfig(): StaticNotebook.INotebookConfig {
+  //   return this._notebookConfig;
+  // }
+  // set notebookConfig(value: StaticNotebook.INotebookConfig) {
+  //   this._notebookConfig = value;
+  //   this._updateNotebookConfig();
+  // }
 }
 
 /**
@@ -607,7 +852,7 @@ export class NotebookViewModel extends WindowedListModel {
  * `null` model, and may want to listen to the `modelChanged`
  * signal.
  */
-export class StaticNotebook extends Widget {
+export class OldStaticNotebook extends Widget {
   /**
    * Construct a notebook widget.
    */
@@ -663,6 +908,8 @@ export class StaticNotebook extends Widget {
 
   /**
    * A signal emitted when the a placeholder cell is rendered.
+   *
+   * @deprecated Since v4
    */
   get placeholderCellRendered(): ISignal<this, Cell> {
     return this._placeholderCellRendered;
@@ -1509,8 +1756,8 @@ export class Notebook extends StaticNotebook {
    * This can be due to the active index changing or the
    * cell at the active index changing.
    */
-  get activeCellChanged(): ISignal<this, Cell> {
-    return this._activeCellChanged;
+  get activeCellChanged(): ISignal<NotebookViewModel, Cell> {
+    return this.viewModel.activeCellChanged;
   }
 
   /**
@@ -1572,37 +1819,20 @@ export class Notebook extends StaticNotebook {
    * The index will be clamped to the bounds of the notebook cells.
    */
   get activeCellIndex(): number {
-    if (!this.model) {
-      return -1;
-    }
-    return this.model.cells.length ? this._activeCellIndex : -1;
+    return this.viewModel.activeCellIndex;
   }
-  set activeCellIndex(newValue: number) {
-    const oldValue = this._activeCellIndex;
-    if (!this.model || !this.model.cells.length) {
-      newValue = -1;
-    } else {
-      newValue = Math.max(newValue, 0);
-      newValue = Math.min(newValue, this.model.cells.length - 1);
-    }
 
-    this._activeCellIndex = newValue;
+  set activeCellIndex(newValue: number) {
+    const oldValue = this.viewModel.activeCellIndex;
+    this.viewModel.activeCellIndex = newValue;
     const cell = this.widgets[newValue];
-    if (cell !== this._activeCell) {
-      // Post an update request.
-      this.update();
-      this._activeCell = cell;
-      this._activeCellChanged.emit(cell);
-    }
     if (this.mode === 'edit' && cell instanceof MarkdownCell) {
       cell.rendered = false;
     }
     this._ensureFocus();
-    if (newValue === oldValue) {
-      return;
+    if (newValue !== oldValue) {
+      this._trimSelections();
     }
-    this._trimSelections();
-    this._stateChanged.emit({ name: 'activeCellIndex', oldValue, newValue });
   }
 
   /**
@@ -1612,7 +1842,7 @@ export class Notebook extends StaticNotebook {
    * This is a cell or `null` if there is no active cell.
    */
   get activeCell(): Cell | null {
-    return this._activeCell;
+    return this.viewModel.activeCell;
   }
 
   get lastClipboardInteraction(): 'copy' | 'cut' | 'paste' | null {
@@ -1620,17 +1850,6 @@ export class Notebook extends StaticNotebook {
   }
   set lastClipboardInteraction(newValue: 'copy' | 'cut' | 'paste' | null) {
     this._lastClipboardInteraction = newValue;
-  }
-
-  /**
-   * Dispose of the resources held by the widget.
-   */
-  dispose(): void {
-    if (this.isDisposed) {
-      return;
-    }
-    this._activeCell = null;
-    super.dispose();
   }
 
   /**
@@ -1676,7 +1895,7 @@ export class Notebook extends StaticNotebook {
    * Whether a cell is selected or is the active cell.
    */
   isSelectedOrActive(widget: Cell): boolean {
-    if (widget === this._activeCell) {
+    if (widget === this.viewModel.activeCell) {
       return true;
     }
     return Private.selectedProperty.get(widget);
@@ -1958,6 +2177,7 @@ export class Notebook extends StaticNotebook {
         this._evtDrop(event as IDragEvent);
         break;
       default:
+        super.handleEvent(event);
         break;
     }
   }
@@ -2003,6 +2223,7 @@ export class Notebook extends StaticNotebook {
     node.removeEventListener('lm-drop', this, true);
     document.removeEventListener('mousemove', this, true);
     document.removeEventListener('mouseup', this, true);
+    super.onBeforeAttach(msg);
   }
 
   /**
@@ -2010,6 +2231,7 @@ export class Notebook extends StaticNotebook {
    */
   protected onAfterShow(msg: Message): void {
     this._checkCacheOnNextResize = true;
+    super.onAfterShow(msg);
   }
 
   /**
@@ -2046,12 +2268,14 @@ export class Notebook extends StaticNotebook {
     // Update cache
     const width = parseInt(this.node.style.width, 10);
     this._cellLayoutStateCache = { width };
+    super.onBeforeHide(msg);
   }
 
   /**
    * Handle `'activate-request'` messages.
    */
   protected onActivateRequest(msg: Message): void {
+    super.onActivateRequest(msg);
     this._ensureFocus(true);
   }
 
@@ -2059,6 +2283,7 @@ export class Notebook extends StaticNotebook {
    * Handle `update-request` messages sent to the widget.
    */
   protected onUpdateRequest(msg: Message): void {
+    super.onUpdateRequest(msg);
     const activeCell = this.activeCell;
 
     // Set the appropriate classes on the cells.
@@ -2166,7 +2391,8 @@ export class Notebook extends StaticNotebook {
     oldValue: INotebookModel,
     newValue: INotebookModel
   ): void {
-    super.onModelChanged(oldValue, newValue);
+    // TODO
+    // super.onModelChanged(oldValue, newValue);
 
     // Try to set the active cell index to 0.
     // It will be set to `-1` if there is no new model or the model is empty.
@@ -2801,15 +3027,13 @@ export class Notebook extends StaticNotebook {
    */
   private _trimSelections(): void {
     for (let i = 0; i < this.widgets.length; i++) {
-      if (i !== this._activeCellIndex) {
+      if (i !== this.viewModel.activeCellIndex) {
         const cell = this.widgets[i];
         cell.model.selections.delete(cell.editor.uuid);
       }
     }
   }
 
-  private _activeCellIndex = -1;
-  private _activeCell: Cell | null = null;
   private _mode: NotebookMode = 'command';
   private _drag: Drag | null = null;
   private _fragment = '';
@@ -2819,7 +3043,6 @@ export class Notebook extends StaticNotebook {
     index: number;
   } | null = null;
   private _mouseMode: 'select' | 'couldDrag' | null = null;
-  private _activeCellChanged = new Signal<this, Cell>(this);
   private _stateChanged = new Signal<this, IChangedArgs<any>>(this);
   private _selectionChanged = new Signal<this, void>(this);
 

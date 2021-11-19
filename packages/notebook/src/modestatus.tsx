@@ -116,7 +116,10 @@ export namespace CommandEditStatus {
       if (oldNotebook !== null) {
         oldNotebook.stateChanged.disconnect(this._onChanged, this);
         oldNotebook.activeCellChanged.disconnect(this._onChanged, this);
-        oldNotebook.modelContentChanged.disconnect(this._onChanged, this);
+        oldNotebook.viewModel.modelContentChanged.disconnect(
+          this._onChanged,
+          this
+        );
       }
 
       const oldMode = this._notebookMode;
@@ -127,7 +130,10 @@ export namespace CommandEditStatus {
         this._notebookMode = this._notebook.mode;
         this._notebook.stateChanged.connect(this._onChanged, this);
         this._notebook.activeCellChanged.connect(this._onChanged, this);
-        this._notebook.modelContentChanged.connect(this._onChanged, this);
+        this._notebook.viewModel.modelContentChanged.connect(
+          this._onChanged,
+          this
+        );
       }
 
       this._triggerChange(oldMode, this._notebookMode);
@@ -136,10 +142,10 @@ export namespace CommandEditStatus {
     /**
      * On a change to the notebook, update the mode.
      */
-    private _onChanged = (_notebook: Notebook) => {
+    private _onChanged = () => {
       const oldMode = this._notebookMode;
       if (this._notebook) {
-        this._notebookMode = _notebook.mode;
+        this._notebookMode = this._notebook.mode;
       } else {
         this._notebookMode = 'command';
       }

@@ -136,7 +136,7 @@ const notebooks: JupyterFrontEndPlugin<void> = {
         const anchor = parent.content;
         const editor = anchor.activeCell?.editor;
         const kernel = parent.sessionContext.session?.kernel;
-        const rendermime = anchor.rendermime;
+        const rendermime = anchor.viewModel.rendermime;
 
         // If all components necessary for rendering exist, create a tooltip.
         if (!!editor && !!kernel && !!rendermime) {

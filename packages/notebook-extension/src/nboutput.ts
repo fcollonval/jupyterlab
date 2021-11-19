@@ -43,7 +43,7 @@ function activateNBOutput(
         KernelMessage.isExecuteResultMsg(msg)
       ) {
         const logger = loggerRegistry!.getLogger(nb.context.path);
-        logger.rendermime = nb.content.rendermime;
+        logger.rendermime = nb.content.viewModel.rendermime;
         const data: nbformat.IOutput = {
           ...msg.content,
           output_type: msg.header.msg_type

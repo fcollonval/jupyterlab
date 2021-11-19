@@ -214,7 +214,7 @@ const notebooks: JupyterFrontEndPlugin<void> = {
     // Create a handler for each notebook that is created.
     notebooks.widgetAdded.connect((sender, parent) => {
       const sessionContext = parent.sessionContext;
-      const rendermime = parent.content.rendermime;
+      const rendermime = parent.content.viewModel.rendermime;
       const connector = new KernelConnector({ sessionContext });
       const handler = new InspectionHandler({ connector, rendermime });
 

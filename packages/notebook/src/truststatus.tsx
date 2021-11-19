@@ -8,7 +8,7 @@ import {
 } from '@jupyterlab/ui-components';
 import { toArray } from '@lumino/algorithm';
 import React from 'react';
-import { INotebookModel, Notebook } from '.';
+import { INotebookModel, Notebook, NotebookViewModel } from '.';
 
 /**
  * Determine the notebook trust status message.
@@ -177,7 +177,10 @@ export namespace NotebookTrustStatus {
           this
         );
 
-        oldNotebook.modelContentChanged.disconnect(this._onModelChanged, this);
+        oldNotebook.viewModel.modelContentChanged.disconnect(
+          this._onModelChanged,
+          this
+        );
       }
 
       const oldState = this._getAllState();
@@ -192,7 +195,10 @@ export namespace NotebookTrustStatus {
           this._onActiveCellChanged,
           this
         );
-        this._notebook.modelContentChanged.connect(this._onModelChanged, this);
+        this._notebook.viewModel.modelContentChanged.connect(
+          this._onModelChanged,
+          this
+        );
 
         // Derive values
         if (this._notebook.activeCell !== undefined) {
@@ -215,7 +221,7 @@ export namespace NotebookTrustStatus {
     /**
      * When the notebook model changes, update the trust state.
      */
-    private _onModelChanged(notebook: Notebook): void {
+    private _onModelChanged(notebook: NotebookViewModel): void {
       const oldState = this._getAllState();
       const { total, trusted } = this._deriveCellTrustState(notebook.model);
 
@@ -227,7 +233,10 @@ export namespace NotebookTrustStatus {
     /**
      * When the active cell changes, update the trust state.
      */
-    private _onActiveCellChanged(model: Notebook, cell: Cell | null): void {
+    private _onActiveCellChanged(
+      model: NotebookViewModel,
+      cell: Cell | null
+    ): void {
       const oldState = this._getAllState();
       if (cell) {
         this._activeCellTrusted = cell.model.trusted;

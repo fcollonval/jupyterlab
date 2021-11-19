@@ -367,7 +367,7 @@ export namespace NotebookActions {
     const state = Private.getState(notebook);
     const model = notebook.model;
     const cell = model.contentFactory.createCell(
-      notebook.notebookConfig.defaultCell,
+      notebook.viewModel.notebookConfig.defaultCell,
       {}
     );
     const active = notebook.activeCellIndex;
@@ -399,7 +399,7 @@ export namespace NotebookActions {
     const state = Private.getState(notebook);
     const model = notebook.model;
     const cell = model.contentFactory.createCell(
-      notebook.notebookConfig.defaultCell,
+      notebook.viewModel.notebookConfig.defaultCell,
       {}
     );
 
@@ -557,7 +557,7 @@ export namespace NotebookActions {
 
     if (notebook.activeCellIndex === notebook.widgets.length - 1) {
       const cell = model.contentFactory.createCell(
-        notebook.notebookConfig.defaultCell,
+        notebook.viewModel.notebookConfig.defaultCell,
         {}
       );
 
@@ -600,7 +600,7 @@ export namespace NotebookActions {
     const promise = Private.runSelected(notebook, sessionContext);
     const model = notebook.model;
     const cell = model.contentFactory.createCell(
-      notebook.notebookConfig.defaultCell,
+      notebook.viewModel.notebookConfig.defaultCell,
       {}
     );
 
@@ -1117,7 +1117,7 @@ export namespace NotebookActions {
     }
 
     const state = Private.getState(notebook);
-    const config = notebook.editorConfig;
+    const config = notebook.viewModel.editorConfig;
     const lineNumbers = !(
       config.code.lineNumbers &&
       config.markdown.lineNumbers &&
@@ -1129,7 +1129,7 @@ export namespace NotebookActions {
       raw: { ...config.raw, lineNumbers }
     };
 
-    notebook.editorConfig = newConfig;
+    notebook.viewModel.editorConfig = newConfig;
     Private.handleState(notebook, state);
   }
 
@@ -2026,7 +2026,7 @@ namespace Private {
           executionScheduled.emit({ notebook, cell });
           return CodeCell.execute(cell as CodeCell, sessionContext, {
             deletedCells,
-            recordTiming: notebook.notebookConfig.recordTiming
+            recordTiming: notebook.viewModel.notebookConfig.recordTiming
           })
             .then(reply => {
               deletedCells.splice(0, deletedCells.length);
@@ -2256,7 +2256,7 @@ namespace Private {
       if (!cells.length) {
         cells.push(
           model.contentFactory.createCell(
-            notebook.notebookConfig.defaultCell,
+            notebook.viewModel.notebookConfig.defaultCell,
             {}
           )
         );

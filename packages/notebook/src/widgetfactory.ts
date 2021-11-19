@@ -87,13 +87,15 @@ export class NotebookWidgetFactory extends ABCWidgetFactory<
     const translator = (context as any).translator;
     const nbOptions = {
       rendermime: source
-        ? source.content.rendermime
+        ? source.content.viewModel.rendermime
         : this.rendermime.clone({ resolver: context.urlResolver }),
       contentFactory: this.contentFactory,
       mimeTypeService: this.mimeTypeService,
-      editorConfig: source ? source.content.editorConfig : this._editorConfig,
+      editorConfig: source
+        ? source.content.viewModel.editorConfig
+        : this._editorConfig,
       notebookConfig: source
-        ? source.content.notebookConfig
+        ? source.content.viewModel.notebookConfig
         : this._notebookConfig,
       translator
     };
