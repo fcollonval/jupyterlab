@@ -259,7 +259,7 @@ export class NotebookModel implements INotebookModel {
         if (!useId) {
           delete cell.id;
         }
-        return sharedModels.createCell(cell);
+        return cell;
       });
       this.sharedModel.insertCells(this.sharedModel.cells.length, ycells);
       this.sharedModel.deleteCellRange(0, this.sharedModel.cells.length);
@@ -360,7 +360,11 @@ close the notebook without saving it.`,
       changes.stateChange.forEach(value => {
         if (value.name !== 'dirty' || this._dirty !== value.newValue) {
           this._dirty = value.newValue;
-          this.triggerStateChange(value);
+          this.triggerStateChange({
+            newValue: undefined,
+            oldValue: undefined,
+            ...value
+          });
         }
       });
     }

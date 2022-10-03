@@ -19,7 +19,7 @@ import { CodeEditor } from './editor';
 import {
   createStandaloneCell,
   ISharedText,
-  TextChange
+  SourceChange
 } from '@jupyterlab/shared-models';
 
 /**
@@ -213,7 +213,7 @@ export class JSONEditor extends Widget {
   /**
    * Handle change events.
    */
-  private _onModelChanged(model: ISharedText, change: TextChange): void {
+  private _onModelChanged(model: ISharedText, change: SourceChange): void {
     if (change.sourceChange) {
       let valid = true;
       try {

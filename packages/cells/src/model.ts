@@ -24,6 +24,7 @@ import {
 } from '@jupyterlab/observables';
 
 import { IOutputAreaModel, OutputAreaModel } from '@jupyterlab/outputarea';
+
 import {
   createStandaloneCell,
   ISharedCell,
@@ -31,6 +32,7 @@ import {
   ISharedMarkdownCell,
   ISharedRawCell
 } from '@jupyterlab/shared-models';
+
 const globalModelDBMutex = models.createMutex();
 
 /**
@@ -318,15 +320,15 @@ export class CellModel extends CodeEditor.Model implements ICellModel {
 
   protected onSharedModelChanged(
     sender: models.ISharedCell,
-    change: models.CellChange<models.ISharedBaseCellMetadata>
+    change: models.CellChange<nbformat.IBaseCellMetadata>
   ) {
     if (change.metadataChange) {
-      const newValue = change.metadataChange.newValue || {};
-      const oldValue = change.metadataChange.oldValue || {};
+      const newValue = change.metadataChange.newValue ?? {};
+      const oldValue = change.metadataChange.oldValue ?? {};
       for (const key in newValue) {
         if (
           oldValue[key] === undefined ||
-          !JSONExt.deepEqual(newValue[key], oldValue[key])
+          !JSONExt.deepEqual(newValue[key]!, oldValue[key]!)
         ) {
           this.metadata.set(key, newValue[key]);
         }
@@ -346,7 +348,7 @@ export class CellModel extends CodeEditor.Model implements ICellModel {
    * @param event The event to handle.
    */
   private _changeCellMetadata(
-    metadata: Partial<models.ISharedBaseCellMetadata>,
+    metadata: Partial<nbformat.IBaseCellMetadata>,
     event: IObservableJSON.IChangedArgs
   ): void {
     switch (event.key) {
@@ -711,7 +713,7 @@ export class CodeCellModel extends CellModel implements ICodeCellModel {
    */
   protected onSharedModelChanged(
     sender: models.ISharedCodeCell,
-    change: models.CellChange<models.ISharedBaseCellMetadata>
+    change: models.CellChange<nbformat.ICodeCellMetadata>
   ): void {
     super.onSharedModelChanged(sender, change);
     globalModelDBMutex(() => {
@@ -727,7 +729,7 @@ export class CodeCellModel extends CellModel implements ICodeCellModel {
    */
   private _onValueChanged(
     slot: models.ISharedCodeCell,
-    change: models.CellChange<models.ISharedBaseCellMetadata>
+    change: models.CellChange<nbformat.ICodeCellMetadata>
   ): void {
     if (change.executionCountChange) {
       if (

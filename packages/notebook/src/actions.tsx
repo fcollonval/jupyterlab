@@ -26,8 +26,6 @@ import { JSONExt, JSONObject } from '@lumino/coreutils';
 import { ISignal, Signal } from '@lumino/signaling';
 import * as React from 'react';
 import { Notebook, StaticNotebook } from './widget';
-import * as sharedModels from '@jupyterlab/shared-models';
-import { createCell, ISharedCell } from '@jupyterlab/shared-models';
 
 /**
  * The mimetype used for Jupyter cell data.
@@ -187,23 +185,18 @@ export namespace NotebookActions {
 
     offsets.push(orig.length);
 
-    const clones: ISharedCell[] = [];
-    for (let i = 0; i + 1 < offsets.length; i++) {
-      const clone = createCell({
-        cell_type: child.model.sharedModel.cell_type
-      });
-      clone.setMetadata(child.model.sharedModel.getMetadata());
-      clones.push(clone);
-    }
+    const clones = offsets.slice(0, -1).map((offset, offsetIdx) => {
+      const { cell_type, metadata } = child.model.sharedModel.toJSON();
 
-    for (let i = 0; i < clones.length; i++) {
-      clones[i].setSource(
-        orig
-          .slice(offsets[i], offsets[i + 1])
+      return {
+        cell_type,
+        metadata,
+        source: orig
+          .slice(offset, offsets[offsetIdx + 1])
           .replace(/^\n+/, '')
           .replace(/\n+$/, '')
-      );
-    }
+      };
+    });
 
     nbModel.sharedModel.transact(() => {
       nbModel.sharedModel.deleteCell(index);
@@ -305,18 +298,17 @@ export namespace NotebookActions {
     notebook.deselectAll();
 
     const primaryModel = primary.model.sharedModel;
-    // Create a new cell for the source to preserve history.
-    const newModel = createCell({
-      cell_type: primaryModel.cell_type,
-      metadata: primaryModel.getMetadata(),
-      source: toMerge.join('\n\n')
-    });
-    if (
-      primaryModel.cell_type === 'markdown' ||
-      primaryModel.cell_type === 'raw'
-    ) {
-      newModel.setAttachments(attachments);
-    }
+    const { cell_type, metadata } = primaryModel.toJSON();
+    const newModel = {
+      cell_type,
+      metadata,
+      source: toMerge.join('\n\n'),
+      attachments:
+        primaryModel.cell_type === 'markdown' ||
+        primaryModel.cell_type === 'raw'
+          ? attachments
+          : undefined
+    };
 
     // Make the changes while preserving history.
     model.sharedModel.transact(() => {
@@ -376,12 +368,11 @@ export namespace NotebookActions {
 
     const state = Private.getState(notebook);
     const model = notebook.model;
-    const cell = sharedModels.createCell({
-      cell_type: notebook.notebookConfig.defaultCell
-    });
     const active = notebook.activeCellIndex;
 
-    model.sharedModel.insertCell(active, cell);
+    model.sharedModel.insertCell(active, {
+      cell_type: notebook.notebookConfig.defaultCell
+    });
 
     // Make the newly inserted cell active.
     notebook.activeCellIndex = active;
@@ -407,11 +398,10 @@ export namespace NotebookActions {
 
     const state = Private.getState(notebook);
     const model = notebook.model;
-    const cell = sharedModels.createCell({
+
+    model.sharedModel.insertCell(notebook.activeCellIndex + 1, {
       cell_type: notebook.notebookConfig.defaultCell
     });
-
-    model.sharedModel.insertCell(notebook.activeCellIndex + 1, cell);
 
     // Make the newly inserted cell active.
     notebook.activeCellIndex++;
@@ -560,12 +550,11 @@ export namespace NotebookActions {
     const model = notebook.model;
 
     if (notebook.activeCellIndex === notebook.widgets.length - 1) {
-      const cell = sharedModels.createCell({
-        cell_type: notebook.notebookConfig.defaultCell
-      });
       // Do not use push here, as we want an widget insertion
       // to make sure no placeholder widget is rendered.
-      model.sharedModel.insertCell(notebook.widgets.length, cell);
+      model.sharedModel.insertCell(notebook.widgets.length, {
+        cell_type: notebook.notebookConfig.defaultCell
+      });
       notebook.activeCellIndex++;
       if (notebook.activeCell?.inViewport === false) {
         await signalToPromise(notebook.activeCell.inViewportChanged, 200).catch(
@@ -608,11 +597,9 @@ export namespace NotebookActions {
     const state = Private.getState(notebook);
     const promise = Private.runSelected(notebook, sessionContext);
     const model = notebook.model;
-    const cell = sharedModels.createCell({
+    model.sharedModel.insertCell(notebook.activeCellIndex + 1, {
       cell_type: notebook.notebookConfig.defaultCell
     });
-
-    model.sharedModel.insertCell(notebook.activeCellIndex + 1, cell);
     notebook.activeCellIndex++;
     if (notebook.activeCell?.inViewport === false) {
       await signalToPromise(notebook.activeCell.inViewportChanged, 200).catch(
@@ -1188,16 +1175,6 @@ export namespace NotebookActions {
 
     notebook.mode = 'command';
 
-    const newCells = values.map(cell => {
-      cell.id =
-        cell.cell_type === 'code' &&
-        notebook.lastClipboardInteraction === 'cut' &&
-        typeof cell.id === 'string'
-          ? cell.id
-          : undefined;
-      return sharedModels.createCell(cell);
-    });
-
     let index = 0;
     const prevActiveCellIndex = notebook.activeCellIndex;
 
@@ -1245,10 +1222,21 @@ export namespace NotebookActions {
           break;
       }
 
-      model.sharedModel.insertCells(index, newCells);
+      model.sharedModel.insertCells(
+        index,
+        values.map(cell => {
+          cell.id =
+            cell.cell_type === 'code' &&
+            notebook.lastClipboardInteraction === 'cut' &&
+            typeof cell.id === 'string'
+              ? cell.id
+              : undefined;
+          return cell;
+        })
+      );
     });
 
-    notebook.activeCellIndex = prevActiveCellIndex + newCells.length;
+    notebook.activeCellIndex = prevActiveCellIndex + values.length;
     notebook.deselectAll();
     if (cellsFromClipboard) {
       notebook.lastClipboardInteraction = 'paste';
@@ -2292,17 +2280,17 @@ namespace Private {
     }
 
     // Create a new code cell and add as the next cell.
-    const newCell = sharedModels.createCell({ cell_type: 'code' });
-
     const notebookModel = notebook.model!.sharedModel;
     const cells = notebook.model!.cells;
     const index = findIndex(cells, model => model === cell.model);
 
-    newCell.setSource(text);
     if (index === -1) {
-      notebookModel.insertCell(notebookModel.cells.length, newCell);
+      notebookModel.insertCell(notebookModel.cells.length, {
+        cell_type: 'code',
+        source: text
+      });
     } else {
-      notebookModel.insertCell(index + 1, newCell);
+      notebookModel.insertCell(index + 1, { cell_type: 'code', source: text });
     }
   }
 
@@ -2383,11 +2371,12 @@ namespace Private {
           return;
         }
         if (child.model.type !== value) {
-          const newCell = sharedModels.createCell({ cell_type: value });
-          newCell.setSource(child.model.sharedModel.getSource());
-          newCell.setMetadata(child.model.sharedModel.getMetadata());
           notebookSharedModel.deleteCell(index);
-          notebookSharedModel.insertCell(index, newCell);
+          notebookSharedModel.insertCell(index, {
+            cell_type: value,
+            source: child.model.sharedModel.getSource(),
+            metadata: child.model.sharedModel.getMetadata()
+          });
         }
       });
       if (value === 'markdown') {
@@ -2439,12 +2428,9 @@ namespace Private {
         // within the compound operation to make the deletion of
         // a notebook's last cell undoable.
         if (!sharedModel.cells.length) {
-          sharedModel.insertCell(
-            sharedModel.cells.length,
-            sharedModels.createCell({
-              cell_type: notebook.notebookConfig.defaultCell
-            })
-          );
+          sharedModel.insertCell(sharedModel.cells.length, {
+            cell_type: notebook.notebookConfig.defaultCell
+          });
         }
       });
       // Select the *first* interior cell not deleted or the cell
@@ -2655,8 +2641,7 @@ namespace Private {
       const state = Private.getState(notebook);
       const model = notebook.model!;
       const sharedModel = model!.sharedModel;
-      const newCell = sharedModels.createCell({ cell_type: 'markdown' });
-      sharedModel.insertCell(cellIndex, newCell);
+      sharedModel.insertCell(cellIndex, { cell_type: 'markdown' });
       Private.setMarkdownHeader(model.cells.get(cellIndex), headingLevel);
       notebook.activeCellIndex = cellIndex;
       if (notebook.activeCell?.inViewport === false) {

@@ -3,18 +3,21 @@
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
 
-import * as nbformat from '@jupyterlab/nbformat';
-import { JSONExt, UUID } from '@lumino/coreutils';
+import type * as nbformat from '@jupyterlab/nbformat';
+import { JSONExt, PartialJSONValue, UUID } from '@lumino/coreutils';
 import { ISignal, Signal } from '@lumino/signaling';
 import * as buffer from 'lib0/buffer';
 import { Awareness } from 'y-protocols/awareness';
 import * as Y from 'yjs';
-import {
+import type {
   CellChange,
   Delta,
+  DocumentChange,
   FileChange,
+  IListChange,
+  IMapChange,
+  ISharedAttachmentsCell,
   ISharedBaseCell,
-  ISharedBaseCellMetadata,
   ISharedCell,
   ISharedCodeCell,
   ISharedDocument,
@@ -23,7 +26,9 @@ import {
   ISharedNotebook,
   ISharedRawCell,
   ISharedText,
-  NotebookChange
+  NotebookChange,
+  SharedCell,
+  StateChange
 } from './api';
 
 /**
@@ -46,20 +51,31 @@ export interface IYText extends ISharedText {
 }
 
 /**
- * Cell type.
- */
-export type YCellType = YRawCell | YCodeCell | YMarkdownCell;
-
-/**
  * Generic shareable document.
  */
-export class YDocument<T> implements ISharedDocument {
+export class YDocument<T extends DocumentChange> implements ISharedDocument {
+  constructor() {
+    this.ystate.observe(this.onStateChanged);
+  }
+
+  /**
+   * YJS document
+   */
   readonly ydoc = new Y.Doc();
+  /**
+   * Shared state
+   */
   readonly ystate: Y.Map<any> = this.ydoc.getMap('state');
+  /**
+   * YJS document undo manager
+   */
   readonly undoManager = new Y.UndoManager([], {
     trackedOrigins: new Set([this]),
     doc: this.ydoc
   });
+  /**
+   * Shared awareness
+   */
   readonly awareness = new Awareness(this.ydoc);
 
   /**
@@ -69,6 +85,9 @@ export class YDocument<T> implements ISharedDocument {
     return this._changed;
   }
 
+  /**
+   * Whether the document is disposed or not.
+   */
   get isDisposed(): boolean {
     return this._isDisposed;
   }
@@ -95,6 +114,9 @@ export class YDocument<T> implements ISharedDocument {
       return;
     }
     this._isDisposed = true;
+    this.ystate.unobserve(this.onStateChanged);
+    this.awareness.destroy();
+    this.undoManager.destroy();
     this.ydoc.destroy();
     Signal.clearData(this);
   }
@@ -128,6 +150,25 @@ export class YDocument<T> implements ISharedDocument {
     this.ydoc.transact(f, undoable ? this : null);
   }
 
+  /**
+   * Handle a change to the ystate.
+   */
+  protected onStateChanged = (event: Y.YMapEvent<any>) => {
+    const stateChange = new Array<StateChange<any>>();
+    event.keysChanged.forEach(key => {
+      const change = event.changes.keys.get(key);
+      if (change) {
+        stateChange.push({
+          name: key,
+          oldValue: change.oldValue,
+          newValue: this.ystate.get(key)
+        });
+      }
+    });
+
+    this._changed.emit({ stateChange } as any);
+  };
+
   protected _changed = new Signal<this, T>(this);
   private _isDisposed = false;
 }
@@ -153,13 +194,22 @@ export class YFile
     super();
     this.undoManager.addToScope(this.ysource);
     this.ysource.observe(this._modelObserver);
-    this.ystate.observe(this._onStateChanged);
   }
 
   /**
-   * File text.
+   * YJS file text.
    */
   readonly ysource = this.ydoc.getText('source');
+
+  /**
+   * File text
+   */
+  get source(): string {
+    return this.getSource();
+  }
+  set source(v: string) {
+    this.setSource(v);
+  }
 
   /**
    * Dispose of the resources.
@@ -169,23 +219,22 @@ export class YFile
       return;
     }
     this.ysource.unobserve(this._modelObserver);
-    this.ystate.unobserve(this._onStateChanged);
     super.dispose();
   }
 
   /**
-   * Gets cell's source.
+   * Get the file text.
    *
-   * @returns Cell's source.
+   * @returns File text.
    */
   getSource(): string {
     return this.ysource.toString();
   }
 
   /**
-   * Sets cell's source.
+   * Set the file text.
    *
-   * @param value: New source.
+   * @param value New text
    */
   setSource(value: string): void {
     this.transact(() => {
@@ -199,9 +248,7 @@ export class YFile
    * Replace content from `start' to `end` with `value`.
    *
    * @param start: The start index of the range to replace (inclusive).
-   *
    * @param end: The end index of the range to replace (exclusive).
-   *
    * @param value: New source (optional).
    */
   updateSource(start: number, end: number, value = ''): void {
@@ -218,416 +265,24 @@ export class YFile
    * Handle a change to the ymodel.
    */
   private _modelObserver = (event: Y.YTextEvent) => {
-    const changes: FileChange = {};
-    changes.sourceChange = event.changes.delta as any;
-    this._changed.emit(changes);
+    this._changed.emit({ sourceChange: event.changes.delta as Delta<string> });
   };
-
-  /**
-   * Handle a change to the ystate.
-   */
-  private _onStateChanged = (event: Y.YMapEvent<any>) => {
-    const stateChange: any = [];
-
-    event.keysChanged.forEach(key => {
-      const change = event.changes.keys.get(key);
-      if (change) {
-        stateChange.push({
-          name: key,
-          oldValue: change.oldValue,
-          newValue: this.ystate.get(key)
-        });
-      }
-    });
-
-    this._changed.emit({ stateChange });
-  };
-}
-
-/**
- * These are "templates" that can be used as initial content. All clients will start with the same template which prevents that every joining client will create another "initial" cell.
- *
- * Note that initialization must not be done dynamically. Hence you need to create a static update message that doesn't change.
- *
- * You may creates templates by creating an empty shared notebook model, insert some content (e.g. an initial code cell), and then encoding the update to base64:
- *
- * ```typescript
- * import * as buffer from 'lib0/buffer';
- * import * as Y from 'yjs';
- * import { createCell, YCodeCell, YNotebook } from '@jupyterlab/shared-models';
- *
- * const ynotebook = new YNotebook();
- * const ycell = createCell({ cell_type: 'code' }) as YCodeCell;
- * ycell.execution_count = null;
- * ynotebook.insertCell(0, ycell);
- * // Delete the initial cell
- * ynotebook.deleteCell(1);
- * console.log(ynotebook.cells.length);
- * console.log(ynotebook.cells[0].toJSON());
- * const template = buffer.toBase64(Y.encodeStateAsUpdateV2(ynotebook.ydoc));
- * console.log(template);
- * ```
- *
- * The JSON-representation of the generated Y.Doc would look like this:
- *
- * ```json
- * cells: [
- *   {
- *     source: '',
- *     metadata: {},
- *     cell_type: 'code',
- *     id: 'e513e796-386b-487f-a4ac-4926d572dbb5',
- *     execution_count: null,
- *     outputs: []
- *   }
- * ],
- * ```
- */
-const yCodeCellTemplate =
-  'AAAWo+3Yxg2IqMqfBePt2MYNBMioyp8FBQIBCgEAD0cAJwAoAycABwAnACgDJ3Fjc291cmNlbWV0YWRhdGFjZWxsX3R5cGVpZGV4ZWN1dGlvbl9jb3VudG91dHB1dHNjZWxsc3NvdXJjZW1ldGFkYXRhY2VsbF90eXBlaWRleGVjdXRpb25fY291bnRvdXRwdXRzBggJAg8HBQYICQIPBwUABQEAAAYBAgABAgACQQYCBwB2AHcEY29kZXckNTZhODQwMTItZWRlNS00MmVjLTg1OTAtMTQyMWVlNjE3NDk3fQAHAHYAdwRjb2RldyRlNTEzZTc5Ni0zODZiLTQ4N2YtYTRhYy00OTI2ZDU3MmRiYjV9AAGIlOXPAgEABg==';
-const yMdCellTemplate =
-  'AAAF+8KuWAMCAQIABQcAJwAoJB5jZWxsc3NvdXJjZW1ldGFkYXRhY2VsbF90eXBlaWQFBggJAgMBAAACAQICQQEBBQB2AHcIbWFya2Rvd253JDE2MWUyNDFjLTI3ZWEtNDQ3NC1hMTljLWI5NzZkZDJhN2YxZQA=';
-const yRawCellTemplate =
-  'AAAGyp/SnR8DAgECAAUHACcAKCQeY2VsbHNzb3VyY2VtZXRhZGF0YWNlbGxfdHlwZWlkBQYICQIDAQAAAgECAkEBAQUAdgB3A3Jhd3ckN2M4MGMyMWYtNjIxZi00MWFlLTg5YTAtZGE2YzAzOGE2NjQzAA==';
-
-/**
- * Shared implementation of the Shared Document types.
- *
- * Shared cells can be inserted into a SharedNotebook.
- * Shared cells only start emitting events when they are connected to a SharedNotebook.
- *
- * "Standalone" cells must not be inserted into a (Shared)Notebook.
- * Standalone cells emit events immediately after they have been created, but they must not
- * be included into a (Shared)Notebook.
- */
-export class YNotebook
-  extends YDocument<NotebookChange>
-  implements ISharedNotebook
-{
-  /**
-   * Create a new YNotebook.
-   */
-  static create(options: ISharedNotebook.IOptions = {}): ISharedNotebook {
-    return new YNotebook(options);
-  }
-
-  constructor(options: ISharedNotebook.IOptions = {}) {
-    super();
-    this._disableDocumentWideUndoRedo =
-      options.disableDocumentWideUndoRedo ?? false;
-    this.undoManager.addToScope(this.ycells);
-    this.ycells.observe(this._onYCellsChanged);
-    this.cells = this.ycells.toArray().map(ycell => {
-      if (!this._ycellMapping.has(ycell)) {
-        this._ycellMapping.set(ycell, createCellModelFromSharedType(ycell));
-      }
-      return this._ycellMapping.get(ycell) as YCellType;
-    });
-
-    this.ymeta.observe(this._onMetaChanged);
-    this.ystate.observe(this._onStateChanged);
-    // Initialize the document with a template
-    let template: string | null = null;
-    switch (options.initialCellType ?? 'code') {
-      case 'raw':
-        template = yRawCellTemplate;
-        break;
-      case 'markdown':
-        template = yMdCellTemplate;
-        break;
-      case 'code':
-        template = yCodeCellTemplate;
-        break;
-    }
-    if (template) {
-      Y.applyUpdateV2(this.ydoc, buffer.fromBase64(template));
-    }
-  }
-
-  /**
-   * Internal Yjs cells list
-   */
-  private readonly ycells: Y.Array<Y.Map<any>> = this.ydoc.getArray('cells');
-  readonly ymeta: Y.Map<any> = this.ydoc.getMap('meta');
-  readonly ymodel: Y.Map<any> = this.ydoc.getMap('model');
-  readonly cells: YCellType[];
-
-  /**
-   * Wether the the undo/redo logic should be
-   * considered on the full document across all cells.
-   *
-   * @returns The disableDocumentWideUndoRedo setting.
-   */
-  get disableDocumentWideUndoRedo(): boolean {
-    return this._disableDocumentWideUndoRedo;
-  }
-
-  /**
-   * nbformat major version
-   */
-  get nbformat(): number {
-    return this.ymeta.get('nbformat');
-  }
-
-  set nbformat(value: number) {
-    this.transact(() => {
-      this.ymeta.set('nbformat', value);
-    }, false);
-  }
-
-  /**
-   * nbformat minor version
-   */
-  get nbformat_minor(): number {
-    return this.ymeta.get('nbformat_minor');
-  }
-
-  set nbformat_minor(value: number) {
-    this.transact(() => {
-      this.ymeta.set('nbformat_minor', value);
-    }, false);
-  }
-
-  /**
-   * Dispose of the resources.
-   */
-  dispose(): void {
-    if (this.isDisposed) {
-      return;
-    }
-    this.ycells.unobserve(this._onYCellsChanged);
-    this.ymeta.unobserve(this._onMetaChanged);
-    this.ystate.unobserve(this._onStateChanged);
-    super.dispose();
-  }
-
-  /**
-   * Get a shared cell by index.
-   *
-   * @param index: Cell's position.
-   *
-   * @returns The requested shared cell.
-   */
-  getCell(index: number): YCellType {
-    return this.cells[index];
-  }
-
-  /**
-   * Insert a shared cell into a specific position.
-   *
-   * @param index: Cell's position.
-   *
-   * @param cell: Cell to insert.
-   */
-  insertCell(index: number, cell: YCellType): void {
-    this.insertCells(index, [cell]);
-  }
-
-  /**
-   * Insert a list of shared cells into a specific position.
-   *
-   * @param index: Position to insert the cells.
-   *
-   * @param cells: Array of shared cells to insert.
-   */
-  insertCells(index: number, cells: YCellType[]): void {
-    cells.forEach(cell => {
-      this._ycellMapping.set(cell.ymodel, cell);
-      if (!this.disableDocumentWideUndoRedo) {
-        cell.undoManager = this.undoManager;
-      }
-    });
-    this.transact(() => {
-      this.ycells.insert(
-        index,
-        cells.map(cell => cell.ymodel)
-      );
-    });
-  }
-
-  /**
-   * Move a cell.
-   *
-   * @param fromIndex: Index of the cell to move.
-   *
-   * @param toIndex: New position of the cell.
-   */
-  moveCell(fromIndex: number, toIndex: number): void {
-    this.transact(() => {
-      const fromCell: any = this.getCell(fromIndex).clone();
-      this.deleteCell(fromIndex);
-      this.insertCell(toIndex, fromCell);
-    });
-  }
-
-  /**
-   * Remove a cell.
-   *
-   * @param index: Index of the cell to remove.
-   */
-  deleteCell(index: number): void {
-    this.deleteCellRange(index, index + 1);
-  }
-
-  /**
-   * Remove a range of cells.
-   *
-   * @param from: The start index of the range to remove (inclusive).
-   *
-   * @param to: The end index of the range to remove (exclusive).
-   */
-  deleteCellRange(from: number, to: number): void {
-    this.transact(() => {
-      this.ycells.delete(from, to - from);
-    });
-  }
-
-  /**
-   * Returns the metadata associated with the notebook.
-   *
-   * @returns Notebook's metadata.
-   */
-  getMetadata(): nbformat.INotebookMetadata {
-    const meta = this.ymeta.get('metadata');
-    return JSONExt.deepCopy(meta ?? {});
-  }
-
-  /**
-   * Sets the metadata associated with the notebook.
-   *
-   * @param metadata: Notebook's metadata.
-   */
-  setMetadata(metadata: nbformat.INotebookMetadata): void {
-    this.ymeta.set('metadata', JSONExt.deepCopy(metadata));
-  }
-
-  /**
-   * Updates the metadata associated with the notebook.
-   *
-   * @param value: Metadata's attribute to update.
-   */
-  updateMetadata(value: Partial<nbformat.INotebookMetadata>): void {
-    // TODO: Maybe modify only attributes instead of replacing the whole metadata?
-    this.ymeta.set('metadata', Object.assign({}, this.getMetadata(), value));
-  }
-
-  /**
-   * Handle a change to the ystate.
-   */
-  private _onMetaChanged = (event: Y.YMapEvent<any>) => {
-    if (event.keysChanged.has('metadata')) {
-      const change = event.changes.keys.get('metadata');
-      const metadataChange = {
-        oldValue: change?.oldValue ? change!.oldValue : undefined,
-        newValue: this.getMetadata()
-      };
-      this._changed.emit({ metadataChange });
-    }
-
-    if (event.keysChanged.has('nbformat')) {
-      const change = event.changes.keys.get('nbformat');
-      const nbformatChanged = {
-        key: 'nbformat',
-        oldValue: change?.oldValue ? change!.oldValue : undefined,
-        newValue: this.nbformat
-      };
-      this._changed.emit({ nbformatChanged });
-    }
-
-    if (event.keysChanged.has('nbformat_minor')) {
-      const change = event.changes.keys.get('nbformat_minor');
-      const nbformatChanged = {
-        key: 'nbformat_minor',
-        oldValue: change?.oldValue ? change!.oldValue : undefined,
-        newValue: this.nbformat_minor
-      };
-      this._changed.emit({ nbformatChanged });
-    }
-  };
-
-  /**
-   * Handle a change to the ystate.
-   */
-  private _onStateChanged = (event: Y.YMapEvent<any>) => {
-    const stateChange: any = [];
-    event.keysChanged.forEach(key => {
-      const change = event.changes.keys.get(key);
-      if (change) {
-        stateChange.push({
-          name: key,
-          oldValue: change.oldValue,
-          newValue: this.ystate.get(key)
-        });
-      }
-    });
-
-    this._changed.emit({ stateChange });
-  };
-
-  /**
-   * Handle a change to the list of cells.
-   */
-  private _onYCellsChanged = (event: Y.YArrayEvent<Y.Map<any>>) => {
-    // update the type cell mapping by iterating through the added/removed types
-    event.changes.added.forEach(item => {
-      const type = (item.content as Y.ContentType).type as Y.Map<any>;
-      if (!this._ycellMapping.has(type)) {
-        this._ycellMapping.set(type, createCellModelFromSharedType(type));
-      }
-      const cell = this._ycellMapping.get(type) as any;
-      cell._notebook = this;
-      cell._undoManager = this.disableDocumentWideUndoRedo
-        ? new Y.UndoManager([cell.ymodel], {})
-        : this.undoManager;
-    });
-    event.changes.deleted.forEach(item => {
-      const type = (item.content as Y.ContentType).type as Y.Map<any>;
-      const model = this._ycellMapping.get(type);
-      if (model) {
-        model.dispose();
-        this._ycellMapping.delete(type);
-      }
-    });
-    let index = 0;
-    // this reflects the event.changes.delta, but replaces the content of delta.insert with ycells
-    const cellsChange: Delta<ISharedCell[]> = [];
-    event.changes.delta.forEach((d: any) => {
-      if (d.insert != null) {
-        const insertedCells = d.insert.map((ycell: Y.Map<any>) =>
-          this._ycellMapping.get(ycell)
-        );
-        cellsChange.push({ insert: insertedCells });
-        this.cells.splice(index, 0, ...insertedCells);
-        index += d.insert.length;
-      } else if (d.delete != null) {
-        cellsChange.push(d);
-        this.cells.splice(index, d.delete);
-      } else if (d.retain != null) {
-        cellsChange.push(d);
-        index += d.retain;
-      }
-    });
-
-    this._changed.emit({
-      cellsChange: cellsChange
-    });
-  };
-
-  private _disableDocumentWideUndoRedo: boolean;
-  private _ycellMapping: WeakMap<Y.Map<any>, YCellType> = new WeakMap();
 }
 
 /**
  * Create a new shared cell model given the YJS shared type.
  */
-export const createCellModelFromSharedType = (type: Y.Map<any>): YCellType => {
+const createCellModelFromSharedType = (
+  type: Y.Map<any>,
+  options: SharedCell.IOptions = {}
+): YCellType => {
   switch (type.get('cell_type')) {
     case 'code':
-      return new YCodeCell(type, type.get('source'));
+      return new YCodeCell(type, type.get('source'), options);
     case 'markdown':
-      return new YMarkdownCell(type, type.get('source'));
+      return new YMarkdownCell(type, type.get('source'), options);
     case 'raw':
-      return new YRawCell(type, type.get('source'));
+      return new YRawCell(type, type.get('source'), options);
     default:
       throw new Error('Found unknown cell type');
   }
@@ -635,20 +290,20 @@ export const createCellModelFromSharedType = (type: Y.Map<any>): YCellType => {
 
 /**
  * Create a new cell that can be inserted in an existing shared model.
+ *
+ * If no notebook is specified the cell will be standalone.
+ *
+ * @param cell Cell JSON representation
+ * @param notebook Notebook to which the cell will be added
  */
-export const createCell = (
-  cell: (
-    | Partial<nbformat.IRawCell>
-    | Partial<nbformat.ICodeCell>
-    | Partial<nbformat.IMarkdownCell>
-    | Partial<nbformat.IBaseCell>
-  ) & { cell_type: 'markdown' | 'code' | 'raw' | string },
-  factory = BoundCellFactory
+const createCell = (
+  cell: SharedCell.Cell,
+  notebook?: YNotebook
 ): YCodeCell | YMarkdownCell | YRawCell => {
   switch (cell.cell_type) {
     case 'markdown': {
       const mCell = cell as Partial<nbformat.IMarkdownCell>;
-      const ycell = factory.createMarkdownCell(mCell.id);
+      const ycell = YMarkdownCell.create({ id: mCell.id, notebook });
       if (mCell.source != null) {
         ycell.setSource(
           typeof mCell.source === 'string'
@@ -666,7 +321,7 @@ export const createCell = (
     }
     case 'code': {
       const cCell = cell as Partial<nbformat.ICodeCell>;
-      const ycell = factory.createCodeCell(cCell.id);
+      const ycell = YCodeCell.create({ id: cCell.id, notebook });
       if (cCell.source != null) {
         ycell.setSource(
           typeof cCell.source === 'string'
@@ -688,7 +343,7 @@ export const createCell = (
     default: {
       // raw
       const rCell = cell as Partial<nbformat.IRawCell>;
-      const ycell = factory.createRawCell(rCell.id);
+      const ycell = YRawCell.create({ id: rCell.id, notebook });
       if (rCell.source != null) {
         ycell.setSource(
           typeof rCell.source === 'string'
@@ -708,79 +363,69 @@ export const createCell = (
 };
 
 /**
- * Create a new cell that can be inserted in an existing shared model.
+ * Create a new cell that cannot be inserted in an existing shared model.
+ *
+ * @param cell Cell JSON representation
  */
-export const createStandaloneCell = (
-  cell: (
-    | Partial<nbformat.IRawCell>
-    | Partial<nbformat.ICodeCell>
-    | Partial<nbformat.IMarkdownCell>
-  ) & { cell_type: 'markdown' | 'code' | 'raw' }
-) => createCell(cell, StandaloneCellFactory);
+export const createStandaloneCell = (cell: SharedCell.Cell) => createCell(cell);
 
-class StandaloneCellFactory {
-  static createMarkdownCell(id?: string) {
-    return YMarkdownCell.createStandalone(id);
-  }
-  static createCodeCell(id?: string) {
-    return YCodeCell.createStandalone(id);
-  }
-  static createRawCell(id?: string) {
-    return YRawCell.createStandalone(id);
-  }
-}
-
-class BoundCellFactory {
-  static createMarkdownCell(id?: string) {
-    return YMarkdownCell.create({ id });
-  }
-  static createCodeCell(id?: string) {
-    return YCodeCell.create({ id });
-  }
-  static createRawCell(id?: string) {
-    return YRawCell.create({ id });
-  }
-}
-
-export class YBaseCell<Metadata extends ISharedBaseCellMetadata>
+export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
   implements ISharedBaseCell<Metadata>, IYText
 {
   /**
-   * Create a new YRawCell that can be inserted into a YNotebook
+   * Create a new YCell that can be inserted into a YNotebook
+   *
+   * ### Notes
+   * Avoid using this method, you should prefer using `YNotebook.insertCell`.
    */
-  static create(options: ISharedCell.IOptions = {}): YBaseCell<any> {
+  static create(options: SharedCell.IOptions = {}): YBaseCell<any> {
     const ymodel = new Y.Map();
     const ysource = new Y.Text();
     ymodel.set('source', ysource);
     ymodel.set('metadata', {});
     ymodel.set('cell_type', this.prototype.cell_type);
     ymodel.set('id', options.id ?? UUID.uuid4());
-    return new this(ymodel, ysource, options.isStandalone ?? false);
+    return new this(ymodel, ysource, options);
   }
 
   /**
-   * Create a new YRawCell that works standalone. It cannot be
+   * Create a new YCell that works standalone. It cannot be
    * inserted into a YNotebook because the Yjs model is already
    * attached to an anonymous Y.Doc instance.
    */
   static createStandalone(id?: string): YBaseCell<any> {
-    const cell = this.create({ id, isStandalone: true });
-    const doc = new Y.Doc();
-    doc.getArray().insert(0, [cell.ymodel]);
-    cell._awareness = new Awareness(doc);
-    cell._undoManager = new Y.UndoManager([cell.ymodel], {
-      trackedOrigins: new Set([cell])
-    });
+    const cell = this.create({ id });
     return cell;
   }
 
-  constructor(ymodel: Y.Map<any>, ysource: Y.Text, isStandalone = false) {
-    this.isStandalone = isStandalone;
+  constructor(
+    ymodel: Y.Map<any>,
+    ysource: Y.Text,
+    options: SharedCell.IOptions = {}
+  ) {
     this.ymodel = ymodel;
     this._ysource = ysource;
     this._prevSourceLength = ysource ? ysource.length : 0;
-    this.ymodel.observeDeep(this._modelObserver);
+    this._notebook = null;
     this._awareness = null;
+    this._undoManager = null;
+    if (options.notebook) {
+      this._notebook = options.notebook as YNotebook;
+      this._undoManager = this._notebook.disableDocumentWideUndoRedo
+        ? new Y.UndoManager([this.ymodel], {
+            trackedOrigins: new Set([this])
+          })
+        : this._notebook.undoManager;
+    } else {
+      const doc = new Y.Doc();
+      doc.getArray().insert(0, [this.ymodel]);
+      this._awareness = new Awareness(doc);
+      this._undoManager = new Y.UndoManager([this.ymodel], {
+        trackedOrigins: new Set([this])
+      });
+    }
+
+    this.ymodel.observeDeep(this._modelObserver);
   }
 
   /**
@@ -805,6 +450,13 @@ export class YBaseCell<Metadata extends ISharedBaseCellMetadata>
   }
 
   /**
+   * Cell id
+   */
+  get id(): string {
+    return this.getId();
+  }
+
+  /**
    * Whether the model has been disposed or not.
    */
   get isDisposed(): boolean {
@@ -818,13 +470,42 @@ export class YBaseCell<Metadata extends ISharedBaseCellMetadata>
    * inserted into a YNotebook because the Yjs model is already
    * attached to an anonymous Y.Doc instance.
    */
-  readonly isStandalone: boolean;
+  get isStandalone(): boolean {
+    return this._notebook !== null;
+  }
+
+  /**
+   * Cell metadata.
+   */
+  get metadata(): Partial<Metadata> {
+    return this.getMetadata();
+  }
+  set metadata(v: Partial<Metadata>) {
+    this.setMetadata(v);
+  }
+
+  /**
+   * Signal triggered when the cell metadata changes.
+   */
+  get metadataChanged(): ISignal<this, IMapChange> {
+    return this._metadataChanged;
+  }
 
   /**
    * The notebook that this cell belongs to.
    */
   get notebook(): YNotebook | null {
     return this._notebook;
+  }
+
+  /**
+   * Cell input content.
+   */
+  get source(): string {
+    return this.getSource();
+  }
+  set source(v: string) {
+    this.setSource(v);
   }
 
   /**
@@ -909,35 +590,16 @@ export class YBaseCell<Metadata extends ISharedBaseCellMetadata>
     this._isDisposed = true;
     this.ymodel.unobserveDeep(this._modelObserver);
 
-    this._awareness?.destroy();
+    if (this._awareness) {
+      // A new document is created for standalone cell.
+      const doc = this._awareness.doc;
+      this._awareness.destroy();
+      doc.destroy();
+    }
     if (!this.notebook && this._undoManager) {
       this._undoManager.destroy();
     }
     Signal.clearData(this);
-  }
-
-  /**
-   * Gets the cell attachments.
-   *
-   * @returns The cell attachments.
-   */
-  getAttachments(): nbformat.IAttachments | undefined {
-    return this.ymodel.get('attachments');
-  }
-
-  /**
-   * Sets the cell attachments
-   *
-   * @param attachments: The cell attachments.
-   */
-  setAttachments(attachments: nbformat.IAttachments | undefined): void {
-    this.transact(() => {
-      if (attachments == null) {
-        this.ymodel.delete('attachments');
-      } else {
-        this.ymodel.set('attachments', attachments);
-      }
-    });
   }
 
   /**
@@ -1003,10 +665,10 @@ export class YBaseCell<Metadata extends ISharedBaseCellMetadata>
   /**
    * Sets the metadata associated with the notebook.
    *
-   * @param metadata: Notebook's metadata.
+   * @param metadata Notebook's metadata.
    */
-  setMetadata(value: Partial<Metadata>): void {
-    const clone = JSONExt.deepCopy(value) as any;
+  setMetadata(metadata: Partial<Metadata>): void {
+    const clone = JSONExt.deepCopy(metadata) as any;
     if (clone.collapsed != null) {
       clone.jupyter = clone.jupyter || {};
       (clone as any).jupyter.outputs_hidden = clone.collapsed;
@@ -1048,10 +710,14 @@ export class YBaseCell<Metadata extends ISharedBaseCellMetadata>
   }
 
   /**
-   * Handle a change to the ymodel.
+   * Extract changes from YJS events
+   *
+   * @param events YJS events
+   * @returns Cell changes
    */
-  private _modelObserver = (events: Y.YEvent<any>[]) => {
+  protected getChanges(events: Y.YEvent<any>[]): Partial<CellChange<Metadata>> {
     const changes: CellChange<Metadata> = {};
+
     const sourceEvent = events.find(
       event => event.target === this.ymodel.get('source')
     );
@@ -1059,30 +725,41 @@ export class YBaseCell<Metadata extends ISharedBaseCellMetadata>
       changes.sourceChange = sourceEvent.changes.delta as any;
     }
 
-    const outputEvent = events.find(
-      event => event.target === this.ymodel.get('outputs')
-    );
-    if (outputEvent) {
-      changes.outputsChange = outputEvent.changes.delta as any;
-    }
-
     const modelEvent = events.find(event => event.target === this.ymodel) as
       | undefined
       | Y.YMapEvent<any>;
     if (modelEvent && modelEvent.keysChanged.has('metadata')) {
       const change = modelEvent.changes.keys.get('metadata');
-      changes.metadataChange = {
+      const metadataChange = (changes.metadataChange = {
         oldValue: change?.oldValue ? change!.oldValue : undefined,
         newValue: this.getMetadata()
-      };
-    }
+      });
 
-    if (modelEvent && modelEvent.keysChanged.has('execution_count')) {
-      const change = modelEvent.changes.keys.get('execution_count');
-      changes.executionCountChange = {
-        oldValue: change!.oldValue,
-        newValue: this.ymodel.get('execution_count')
-      };
+      const oldValue = metadataChange.oldValue ?? {};
+      const oldKeys = Object.keys(oldValue);
+      const newKeys = Object.keys(metadataChange.newValue);
+      for (let key of new Set(...oldKeys, ...newKeys)) {
+        if (!oldKeys.includes(key)) {
+          this._metadataChanged.emit({
+            key,
+            newValue: metadataChange.newValue[key],
+            type: 'add'
+          });
+        } else if (!newKeys.includes(key)) {
+          this._metadataChanged.emit({
+            key,
+            oldValue: metadataChange.oldValue[key],
+            type: 'remove'
+          });
+        } else if (oldValue[key] !== metadataChange.newValue[key]) {
+          this._metadataChanged.emit({
+            key,
+            newValue: metadataChange.newValue[key],
+            oldValue: metadataChange.oldValue[key],
+            type: 'change'
+          });
+        }
+      }
     }
 
     // The model allows us to replace the complete source with a new string. We express this in the Delta format
@@ -1095,9 +772,18 @@ export class YBaseCell<Metadata extends ISharedBaseCellMetadata>
       ];
     }
     this._prevSourceLength = ysource.length;
-    this._changed.emit(changes);
+
+    return changes;
+  }
+
+  /**
+   * Handle a change to the ymodel.
+   */
+  private _modelObserver = (events: Y.YEvent<any>[]) => {
+    this._changed.emit(this.getChanges(events));
   };
 
+  protected _metadataChanged = new Signal<this, IMapChange>(this);
   /**
    * The notebook that this cell belongs to.
    */
@@ -1114,17 +800,17 @@ export class YBaseCell<Metadata extends ISharedBaseCellMetadata>
  * Shareable code cell.
  */
 export class YCodeCell
-  extends YBaseCell<ISharedBaseCellMetadata>
+  extends YBaseCell<nbformat.IBaseCellMetadata>
   implements ISharedCodeCell
 {
   /**
    * Create a new YCodeCell that can be inserted into a YNotebook
+   *
+   * ### Notes
+   * Avoid using this method, you should prefer using `YNotebook.insertCell`.
    */
-  static create(options: ISharedCell.IOptions = {}): YCodeCell {
-    const cell = super.create(options) as YCodeCell;
-    cell.ymodel.set('execution_count', null); // for some default value
-    cell.ymodel.set('outputs', cell._youtputs);
-    return cell;
+  static create(options: SharedCell.IOptions = {}): YCodeCell {
+    return super.create(options) as YCodeCell;
   }
 
   /**
@@ -1139,10 +825,12 @@ export class YCodeCell
   constructor(
     ymodel: Y.Map<any>,
     ysource: Y.Text,
-    isStandalone: boolean = false
+    options: SharedCell.IOptions = {}
   ) {
-    super(ymodel, ysource, isStandalone);
+    super(ymodel, ysource, options);
     this._youtputs = new Y.Array();
+    this.ymodel.set('execution_count', null); // for some default value
+    this.ymodel.set('outputs', this._youtputs);
   }
 
   /**
@@ -1164,6 +852,16 @@ export class YCodeCell
         this.ymodel.set('execution_count', count);
       });
     }
+  }
+
+  /**
+   * Cell outputs.
+   */
+  get outputs(): Array<nbformat.IOutput> {
+    return this.getOutputs();
+  }
+  set outputs(v: Array<nbformat.IOutput>) {
+    this.setOutputs(v);
   }
 
   /**
@@ -1230,20 +928,118 @@ export class YCodeCell
     };
   }
 
+  /**
+   * Extract changes from YJS events
+   *
+   * @param events YJS events
+   * @returns Cell changes
+   */
+  protected getChanges(
+    events: Y.YEvent<any>[]
+  ): Partial<CellChange<nbformat.IBaseCellMetadata>> {
+    const changes = super.getChanges(events);
+
+    const outputEvent = events.find(
+      event => event.target === this.ymodel.get('outputs')
+    );
+    if (outputEvent) {
+      changes.outputsChange = outputEvent.changes.delta as any;
+    }
+
+    const modelEvent = events.find(event => event.target === this.ymodel) as
+      | undefined
+      | Y.YMapEvent<any>;
+
+    if (modelEvent && modelEvent.keysChanged.has('execution_count')) {
+      const change = modelEvent.changes.keys.get('execution_count');
+      changes.executionCountChange = {
+        oldValue: change!.oldValue,
+        newValue: this.ymodel.get('execution_count')
+      };
+    }
+
+    return changes;
+  }
+
   private _youtputs: Y.Array<nbformat.IOutput>;
+}
+
+class YAttachmentCell
+  extends YBaseCell<nbformat.IBaseCellMetadata>
+  implements ISharedAttachmentsCell
+{
+  /**
+   * Cell attachments
+   */
+  get attachments(): nbformat.IAttachments | undefined {
+    return this.getAttachments();
+  }
+  set attachments(v: nbformat.IAttachments | undefined) {
+    this.setAttachments(v);
+  }
+
+  /**
+   * Gets the cell attachments.
+   *
+   * @returns The cell attachments.
+   */
+  getAttachments(): nbformat.IAttachments | undefined {
+    return this.ymodel.get('attachments');
+  }
+
+  /**
+   * Sets the cell attachments
+   *
+   * @param attachments: The cell attachments.
+   */
+  setAttachments(attachments: nbformat.IAttachments | undefined): void {
+    this.transact(() => {
+      if (attachments == null) {
+        this.ymodel.delete('attachments');
+      } else {
+        this.ymodel.set('attachments', attachments);
+      }
+    });
+  }
+
+  /**
+   * Extract changes from YJS events
+   *
+   * @param events YJS events
+   * @returns Cell changes
+   */
+  protected getChanges(
+    events: Y.YEvent<any>[]
+  ): Partial<CellChange<nbformat.IBaseCellMetadata>> {
+    const changes = super.getChanges(events);
+
+    const modelEvent = events.find(event => event.target === this.ymodel) as
+      | undefined
+      | Y.YMapEvent<any>;
+
+    if (modelEvent && modelEvent.keysChanged.has('attachments')) {
+      const change = modelEvent.changes.keys.get('attachments');
+      changes.executionCountChange = {
+        oldValue: change!.oldValue,
+        newValue: this.ymodel.get('attachments')
+      };
+    }
+
+    return changes;
+  }
 }
 
 /**
  * Shareable raw cell.
  */
-export class YRawCell
-  extends YBaseCell<ISharedBaseCellMetadata>
-  implements ISharedRawCell
-{
+export class YRawCell extends YAttachmentCell implements ISharedRawCell {
   /**
    * Create a new YRawCell that can be inserted into a YNotebook
+   *
+   * ### Notes
+   * Avoid using this method, you should prefer using `YNotebook.insertCell`.
    */
-  static create(options: ISharedCell.IOptions = {}): YRawCell {
+  static create(options: SharedCell.IOptions = {}): YRawCell {
     return super.create(options) as YRawCell;
   }
 
@@ -1281,13 +1077,16 @@ export class YRawCell
  * Shareable markdown cell.
  */
 export class YMarkdownCell
-  extends YBaseCell<ISharedBaseCellMetadata>
+  extends YAttachmentCell
   implements ISharedMarkdownCell
 {
   /**
    * Create a new YMarkdownCell that can be inserted into a YNotebook
+   *
+   * ### Notes
+   * Avoid using this method, you should prefer using `YNotebook.insertCell`.
    */
-  static create(options: ISharedCell.IOptions = {}): YMarkdownCell {
+  static create(options: SharedCell.IOptions = {}): YMarkdownCell {
     return super.create(options) as any;
   }
 
@@ -1319,4 +1118,476 @@ export class YMarkdownCell
       attachments: this.getAttachments()
     };
   }
+}
+
+/**
+ * Cell type.
+ */
+export type YCellType = YRawCell | YCodeCell | YMarkdownCell;
+
+/**
+ * These are "templates" that can be used as initial content. All clients will start with the same template which prevents that every joining client will create another "initial" cell.
+ *
+ * Note that initialization must not be done dynamically. Hence you need to create a static update message that doesn't change.
+ *
+ * You may creates templates by creating an empty shared notebook model, insert some content (e.g. an initial code cell), and then encoding the update to base64:
+ *
+ * ```typescript
+ * import * as buffer from 'lib0/buffer';
+ * import * as Y from 'yjs';
+ * import { YCodeCell, YNotebook } from '@jupyterlab/shared-models';
+ *
+ * const ynotebook = new YNotebook();
+ * const ycell = ynotebook.insertCell(0, { cell_type: 'code' });
+ * ycell.execution_count = null;
+ * // Delete the initial cell
+ * ynotebook.deleteCell(1);
+ * console.log(ynotebook.cells.length);
+ * console.log(ynotebook.cells[0].toJSON());
+ * const template = buffer.toBase64(Y.encodeStateAsUpdateV2(ynotebook.ydoc));
+ * console.log(template);
+ * ```
+ *
+ * The JSON-representation of the generated Y.Doc would look like this:
+ *
+ * ```json
+ * cells: [
+ *   {
+ *     source: '',
+ *     metadata: {},
+ *     cell_type: 'code',
+ *     id: 'e513e796-386b-487f-a4ac-4926d572dbb5',
+ *     execution_count: null,
+ *     outputs: []
+ *   }
+ * ],
+ * ```
+ */
+const yCodeCellTemplate =
+  'AAAWo+3Yxg2IqMqfBePt2MYNBMioyp8FBQIBCgEAD0cAJwAoAycABwAnACgDJ3Fjc291cmNlbWV0YWRhdGFjZWxsX3R5cGVpZGV4ZWN1dGlvbl9jb3VudG91dHB1dHNjZWxsc3NvdXJjZW1ldGFkYXRhY2VsbF90eXBlaWRleGVjdXRpb25fY291bnRvdXRwdXRzBggJAg8HBQYICQIPBwUABQEAAAYBAgABAgACQQYCBwB2AHcEY29kZXckNTZhODQwMTItZWRlNS00MmVjLTg1OTAtMTQyMWVlNjE3NDk3fQAHAHYAdwRjb2RldyRlNTEzZTc5Ni0zODZiLTQ4N2YtYTRhYy00OTI2ZDU3MmRiYjV9AAGIlOXPAgEABg==';
+const yMdCellTemplate =
+  'AAAF+8KuWAMCAQIABQcAJwAoJB5jZWxsc3NvdXJjZW1ldGFkYXRhY2VsbF90eXBlaWQFBggJAgMBAAACAQICQQEBBQB2AHcIbWFya2Rvd253JDE2MWUyNDFjLTI3ZWEtNDQ3NC1hMTljLWI5NzZkZDJhN2YxZQA=';
+const yRawCellTemplate =
+  'AAAGyp/SnR8DAgECAAUHACcAKCQeY2VsbHNzb3VyY2VtZXRhZGF0YWNlbGxfdHlwZWlkBQYICQIDAQAAAgECAkEBAQUAdgB3A3Jhd3ckN2M4MGMyMWYtNjIxZi00MWFlLTg5YTAtZGE2YzAzOGE2NjQzAA==';
+
+/**
+ * Shared implementation of the Shared Document types.
+ *
+ * Shared cells can be inserted into a SharedNotebook.
+ * Shared cells only start emitting events when they are connected to a SharedNotebook.
+ *
+ * "Standalone" cells must not be inserted into a (Shared)Notebook.
+ * Standalone cells emit events immediately after they have been created, but they must not
+ * be included into a (Shared)Notebook.
+ */
+export class YNotebook
+  extends YDocument<NotebookChange>
+  implements ISharedNotebook
+{
+  /**
+   * Create a new YNotebook.
+   */
+  static create(options: ISharedNotebook.IOptions = {}): ISharedNotebook {
+    return new YNotebook(options);
+  }
+
+  constructor(options: ISharedNotebook.IOptions = {}) {
+    super();
+    this._disableDocumentWideUndoRedo =
+      options.disableDocumentWideUndoRedo ?? false;
+    this.cells = this._ycells.toArray().map(ycell => {
+      if (!this._ycellMapping.has(ycell)) {
+        this._ycellMapping.set(
+          ycell,
+          createCellModelFromSharedType(ycell, { notebook: this })
+        );
+      }
+      return this._ycellMapping.get(ycell) as YCellType;
+    });
+
+    this.undoManager.addToScope(this._ycells);
+    this._ycells.observe(this._onYCellsChanged);
+    this.ymeta.observe(this._onMetaChanged);
+
+    // Initialize the document with a template
+    let template: string | null = null;
+    switch (options.initialCellType ?? 'code') {
+      case 'raw':
+        template = yRawCellTemplate;
+        break;
+      case 'markdown':
+        template = yMdCellTemplate;
+        break;
+      case 'code':
+        template = yCodeCellTemplate;
+        break;
+    }
+    if (template) {
+      Y.applyUpdateV2(this.ydoc, buffer.fromBase64(template));
+    }
+  }
+
+  /**
+   * YJS map for the notebook metadata
+   */
+  readonly ymeta: Y.Map<any> = this.ydoc.getMap('meta');
+  /**
+   * YJS notebook model
+   */
+  readonly ymodel: Y.Map<any> = this.ydoc.getMap('model');
+  /**
+   * Cells list
+   */
+  readonly cells: YCellType[];
+
+  /**
+   * Signal triggered when the cells list changes.
+   */
+  get cellsChanged(): ISignal<this, IListChange> {
+    return this._cellsChanged;
+  }
+
+  /**
+   * Wether the undo/redo logic should be
+   * considered on the full document across all cells.
+   *
+   * Default: false
+   */
+  get disableDocumentWideUndoRedo(): boolean {
+    return this._disableDocumentWideUndoRedo;
+  }
+
+  /**
+   * Notebook metadata
+   */
+  get metadata(): nbformat.INotebookMetadata {
+    return this.getMetadata();
+  }
+  set metadata(v: nbformat.INotebookMetadata) {
+    this.setMetadata(v);
+  }
+
+  /**
+   * Signal triggered when a metadata changes.
+   */
+  get metadataChanged(): ISignal<this, IMapChange> {
+    return this._metadataChanged;
+  }
+
+  /**
+   * nbformat major version
+   */
+  get nbformat(): number {
+    return this.ymeta.get('nbformat');
+  }
+  set nbformat(value: number) {
+    this.transact(() => {
+      this.ymeta.set('nbformat', value);
+    }, false);
+  }
+
+  /**
+   * nbformat minor version
+   */
+  get nbformat_minor(): number {
+    return this.ymeta.get('nbformat_minor');
+  }
+  set nbformat_minor(value: number) {
+    this.transact(() => {
+      this.ymeta.set('nbformat_minor', value);
+    }, false);
+  }
+
+  /**
+   * Dispose of the resources.
+   */
+  dispose(): void {
+    if (this.isDisposed) {
+      return;
+    }
+    this._ycells.unobserve(this._onYCellsChanged);
+    this.ymeta.unobserve(this._onMetaChanged);
+    super.dispose();
+  }
+
+  /**
+   * Get a shared cell by index.
+   *
+   * @param index: Cell's position.
+   *
+   * @returns The requested shared cell.
+   */
+  getCell(index: number): YCellType {
+    return this.cells[index];
+  }
+
+  /**
+   * Insert a shared cell into a specific position.
+   *
+   * @param index: Cell's position.
+   * @param cell: Cell to insert.
+   *
+   * @returns The inserted cell.
+   */
+  insertCell(
+    index: number,
+    cell: SharedCell.Cell
+  ): YBaseCell<nbformat.IBaseCellMetadata> {
+    return this.insertCells(index, [cell])[0];
+  }
+
+  /**
+   * Insert a list of shared cells into a specific position.
+   *
+   * @param index: Position to insert the cells.
+   * @param cells: Array of shared cells to insert.
+   *
+   * @returns The inserted cells.
+   */
+  insertCells(
+    index: number,
+    cells: SharedCell.Cell[]
+  ): YBaseCell<nbformat.IBaseCellMetadata>[] {
+    const yCells = cells.map(c => {
+      const cell = createCell(c, this);
+      this._ycellMapping.set(cell.ymodel, cell);
+      return cell;
+    });
+
+    this.transact(() => {
+      this._ycells.insert(
+        index,
+        yCells.map(cell => cell.ymodel)
+      );
+    });
+
+    return yCells;
+  }
+
+  /**
+   * Move a cell.
+   *
+   * @param fromIndex: Index of the cell to move.
+   * @param toIndex: New position of the cell.
+   */
+  moveCell(fromIndex: number, toIndex: number): void {
+    this.transact(() => {
+      const fromCell: any = this.getCell(fromIndex).clone();
+      this.deleteCell(fromIndex);
+      this.insertCell(toIndex, fromCell);
+    });
+  }
+
+  /**
+   * Remove a cell.
+   *
+   * @param index: Index of the cell to remove.
+   */
+  deleteCell(index: number): void {
+    this.deleteCellRange(index, index + 1);
+  }
+
+  /**
+   * Remove a range of cells.
+   *
+   * @param from: The start index of the range to remove (inclusive).
+   * @param to: The end index of the range to remove (exclusive).
+   */
+  deleteCellRange(from: number, to: number): void {
+    this.transact(() => {
+      this._ycells.delete(from, to - from);
+    });
+  }
+
+  /**
+   * Returns some metadata associated with the notebook.
+   *
+   * If no `key` is provided, it will return all metadata.
+   * Else it will return the value for that key.
+   *
+   * @param key Key to get from the metadata
+   * @returns Notebook's metadata.
+   */
+  getMetadata(key?: string): nbformat.INotebookMetadata {
+    const meta = this.ymeta.get('metadata');
+
+    if (typeof key === 'string') {
+      return JSONExt.deepCopy(meta[key]);
+    } else {
+      return JSONExt.deepCopy(meta ?? {});
+    }
+  }
+
+  /**
+   * Sets some metadata associated with the notebook.
+   *
+   * If only one argument is provided, it will override all notebook metadata.
+   * Otherwise a single key will be set to a new value.
+   *
+   * @param metadata All Notebook's metadata or the key to set.
+   * @param value New metadata value
+   */
+  setMetadata(
+    metadata: nbformat.INotebookMetadata | string,
+    value?: PartialJSONValue
+  ): void {
+    if (typeof metadata === 'string') {
+      if (typeof value === 'undefined') {
+        throw new TypeError(
+          `Metadata value for ${metadata} cannot be 'undefined'.`
+        );
+      }
+      const meta = this.ymeta.get('metadata');
+      this.ymeta.set('metadata', { ...meta, metadata: value });
+    } else {
+      this.ymeta.set('metadata', JSONExt.deepCopy(metadata));
+    }
+  }
+
+  /**
+   * Updates the metadata associated with the notebook.
+   *
+   * @param value: Metadata's attribute to update.
+   */
+  updateMetadata(value: Partial<nbformat.INotebookMetadata>): void {
+    // TODO: Maybe modify only attributes instead of replacing the whole metadata?
+    this.ymeta.set('metadata', { ...this.getMetadata(), ...value });
+  }
+
+  /**
+   * Handle a change to the ystate.
+   */
+  private _onMetaChanged = (event: Y.YMapEvent<any>) => {
+    if (event.keysChanged.has('metadata')) {
+      const change = event.changes.keys.get('metadata');
+      const metadataChange = {
+        oldValue: change?.oldValue ? change!.oldValue : undefined,
+        newValue: this.getMetadata()
+      };
+
+      const oldValue = metadataChange.oldValue ?? {};
+      const oldKeys = Object.keys(oldValue);
+      const newKeys = Object.keys(metadataChange.newValue);
+      for (let key of new Set(...oldKeys, ...newKeys)) {
+        if (!oldKeys.includes(key)) {
+          this._metadataChanged.emit({
+            key,
+            newValue: metadataChange.newValue[key],
+            type: 'add'
+          });
+        } else if (!newKeys.includes(key)) {
+          this._metadataChanged.emit({
+            key,
+            oldValue: metadataChange.oldValue[key],
+            type: 'remove'
+          });
+        } else if (oldValue[key] !== metadataChange.newValue[key]) {
+          this._metadataChanged.emit({
+            key,
+            newValue: metadataChange.newValue[key],
+            oldValue: metadataChange.oldValue[key],
+            type: 'change'
+          });
+        }
+      }
+
+      this._changed.emit({ metadataChange });
+    }
+
+    if (event.keysChanged.has('nbformat')) {
+      const change = event.changes.keys.get('nbformat');
+      const nbformatChanged = {
+        key: 'nbformat',
+        oldValue: change?.oldValue ? change!.oldValue : undefined,
+        newValue: this.nbformat
+      };
+      this._changed.emit({ nbformatChanged });
+    }
+
+    if (event.keysChanged.has('nbformat_minor')) {
+      const change = event.changes.keys.get('nbformat_minor');
+      const nbformatChanged = {
+        key: 'nbformat_minor',
+        oldValue: change?.oldValue ? change!.oldValue : undefined,
+        newValue: this.nbformat_minor
+      };
+      this._changed.emit({ nbformatChanged });
+    }
+  };
+
+  /**
+   * Handle a change to the list of cells.
+   */
+  private _onYCellsChanged = (event: Y.YArrayEvent<Y.Map<any>>) => {
+    // update the type cell mapping by iterating through the added/removed types
+    event.changes.added.forEach(item => {
+      const type = (item.content as Y.ContentType).type as Y.Map<any>;
+      if (!this._ycellMapping.has(type)) {
+        this._ycellMapping.set(
+          type,
+          createCellModelFromSharedType(type, { notebook: this })
+        );
+      }
+    });
+    event.changes.deleted.forEach(item => {
+      const type = (item.content as Y.ContentType).type as Y.Map<any>;
+      const model = this._ycellMapping.get(type);
+      if (model) {
+        model.dispose();
+        this._ycellMapping.delete(type);
+      }
+    });
+    let index = 0;
+    // this reflects the event.changes.delta, but replaces the content of delta.insert with ycells
+
+    // Q why not remapping from ycells?  this.cells = this.ycells.map(yc => this._ycellMapping.get(yc))
+    const cellsChange: Delta<ISharedCell[]> = [];
+    event.changes.delta.forEach((d: any) => {
+      if (d.insert != null) {
+        const insertedCells = d.insert.map((ycell: Y.Map<any>) =>
+          this._ycellMapping.get(ycell)
+        );
+        cellsChange.push({ insert: insertedCells });
+        this.cells.splice(index, 0, ...insertedCells);
+
+        this._cellsChanged.emit({
+          type: 'add',
+          newIndex: index,
+          newValues: insertedCells,
+          oldIndex: -2,
+          oldValues: []
+        });
+
+        index += d.insert.length;
+      } else if (d.delete != null) {
+        cellsChange.push(d);
+        const oldValues = this.cells.splice(index, d.delete);
+
+        this._cellsChanged.emit({
+          type: 'remove',
+          newIndex: -1,
+          newValues: [],
+          oldIndex: index,
+          oldValues
+        });
+      } else if (d.retain != null) {
+        cellsChange.push(d);
+        index += d.retain;
+      }
+    });
+
+    this._changed.emit({
+      cellsChange: cellsChange
+    });
+  };
+
+  protected _cellsChanged = new Signal<this, IListChange>(this);
+  protected _metadataChanged = new Signal<this, IMapChange>(this);
+  /**
+   * Internal Yjs cells list
+   */
+  protected readonly _ycells: Y.Array<Y.Map<any>> = this.ydoc.getArray('cells');
+
+  private _disableDocumentWideUndoRedo: boolean;
+  private _ycellMapping: WeakMap<Y.Map<any>, YCellType> = new WeakMap();
 }
