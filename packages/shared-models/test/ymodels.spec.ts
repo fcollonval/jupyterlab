@@ -1,7 +1,7 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { IMapChange, YCodeCell, YNotebook } from '../src';
+import { IListChange, IMapChange, YCodeCell, YNotebook } from '../src';
 
 describe('@jupyterlab/shared-models', () => {
   describe('YNotebook', () => {
@@ -188,7 +188,7 @@ describe('@jupyterlab/shared-models', () => {
         notebook.metadataChanged.connect((_, c) => {
           changes.push(c);
         });
-        notebook.metadata = metadata;
+        notebook.deleteMetadata('test');
 
         expect(changes).toHaveLength(1);
         expect(changes).toEqual([
@@ -255,6 +255,78 @@ describe('@jupyterlab/shared-models', () => {
         codeCell.updateSource(0, 0, 'hello');
         expect(codeCell.getSource()).toBe('hellotest');
       });
+
+      it('should emit a add cells change', () => {
+        const notebook = YNotebook.create();
+        const changes: IListChange[] = [];
+        notebook.cellsChanged.connect((_, c) => {
+          changes.push(c);
+        });
+        const codeCell = notebook.insertCell(0, { cell_type: 'code' });
+
+        expect(changes).toHaveLength(1);
+        expect(changes).toEqual([
+          {
+            type: 'add',
+            newIndex: 0,
+            newValues: [codeCell],
+            oldIndex: -2,
+            oldValues: []
+          }
+        ]);
+      });
+
+      it('should emit a delete cells change', () => {
+        const notebook = YNotebook.create();
+        const changes: IListChange[] = [];
+        const codeCell = notebook.insertCell(0, { cell_type: 'code' });
+
+        notebook.cellsChanged.connect((_, c) => {
+          changes.push(c);
+        });
+        notebook.deleteCell(0);
+
+        expect(changes).toHaveLength(1);
+        expect(changes).toEqual([
+          {
+            type: 'delete',
+            oldIndex: 0,
+            oldValues: [codeCell],
+            newIndex: -1,
+            newValues: []
+          }
+        ]);
+      });
+
+      it('should emit add and delete cells changes when moving a cell', () => {
+        const notebook = YNotebook.create();
+        const changes: IListChange[] = [];
+        const codeCell = notebook.addCell({ cell_type: 'code' });
+        notebook.addCell({ cell_type: 'markdown' });
+
+        notebook.cellsChanged.connect((_, c) => {
+          changes.push(c);
+        });
+        notebook.moveCell(0, 1);
+
+        expect(changes).toHaveLength(2);
+        expect(changes).toEqual([
+          {
+            type: 'delete',
+            oldIndex: 0,
+            oldValues: [codeCell],
+            newIndex: -1,
+            newValues: []
+          },
+          {
+            type: 'add',
+            newIndex: 1,
+            newValues: [codeCell],
+            oldIndex: -2,
+            oldValues: []
+          }
+        ]);
+      });
     });
   });
 
@@ -270,6 +342,181 @@ describe('@jupyterlab/shared-models', () => {
       codeCell.setSource('test');
       codeCell.updateSource(0, 0, 'hello');
       expect(codeCell.getSource()).toBe('hellotest');
+    });
+
+    it('should get metadata', () => {
+      const cell = YCodeCell.create();
+      const metadata = {
+        collapsed: true,
+        editable: false,
+        name: 'cell-name'
+      };
+
+      cell.setMetadata(metadata);
+
+      expect(cell.metadata).toEqual(metadata);
+    });
+
+    it('should get all metadata', () => {
+      const cell = YCodeCell.create();
+      const metadata = {
+        collapsed: true,
+        editable: false,
+        name: 'cell-name'
+      };
+
+      cell.setMetadata(metadata);
+
+      expect(cell.getMetadata()).toEqual(metadata);
+    });
+
+    it('should get one metadata', () => {
+      const cell = YCodeCell.create();
+      const metadata = {
+        collapsed: true,
+        editable: false,
+        name: 'cell-name'
+      };
+
+      cell.setMetadata(metadata);
+
+      expect(cell.getMetadata('editable')).toEqual(metadata.editable);
+    });
+
+    it('should set one metadata', () => {
+      const cell = YCodeCell.create();
+      const metadata = {
+        collapsed: true,
+        editable: false,
+        name: 'cell-name'
+      };
+
+      cell.setMetadata(metadata);
+      cell.setMetadata('test', 'banana');
+
+      expect(cell.getMetadata('test')).toEqual('banana');
+    });
+
+    it('should emit all metadata changes', () => {
+      const notebook = YNotebook.create();
+      const metadata = {
+        collapsed: true,
+        editable: false,
+        name: 'cell-name'
+      };
+
+      const changes: IMapChange[] = [];
+      notebook.metadataChanged.connect((_, c) => {
+        changes.push(c);
+      });
+      notebook.metadata = metadata;
+
+      expect(changes).toHaveLength(3);
+      expect(changes).toEqual([
+        {
+          type: 'add',
+          key: 'collapsed',
+          newValue: metadata.collapsed,
+          oldValue: undefined
+        },
+        {
+          type: 'add',
+          key: 'editable',
+          newValue: metadata.editable,
+          oldValue: undefined
+        },
+        {
+          type: 'add',
+          key: 'name',
+          newValue: metadata.name,
+          oldValue: undefined
+        }
+      ]);
+
+      notebook.dispose();
+    });
+
+    it('should emit a add metadata change', () => {
+      const cell = YCodeCell.create();
+      const metadata = {
+        collapsed: true,
+        editable: false,
+        name: 'cell-name'
+      };
+      cell.metadata = metadata;
+
+      const changes: IMapChange[] = [];
+      cell.metadataChanged.connect((_, c) => {
+        changes.push(c);
+      });
+      cell.setMetadata('test', 'banana');
+
+      expect(changes).toHaveLength(1);
+      expect(changes).toEqual([
+        { type: 'add', key: 'test', newValue: 'banana', oldValue: undefined }
+      ]);
+
+      cell.dispose();
+    });
+
+    it('should emit a delete metadata change', () => {
+      const cell = YCodeCell.create();
+      const metadata = {
+        collapsed: true,
+        editable: false,
+        name: 'cell-name'
+      };
+      cell.metadata = metadata;
+
+      const changes: IMapChange[] = [];
+      cell.setMetadata('test', 'banana');
+
+      cell.metadataChanged.connect((_, c) => {
+        changes.push(c);
+      });
+      cell.deleteMetadata('test');
+
+      expect(changes).toHaveLength(1);
+      expect(changes).toEqual([
+        {
+          type: 'delete',
+          key: 'test',
+          newValue: undefined,
+          oldValue: 'banana'
+        }
+      ]);
+
+      cell.dispose();
+    });
+
+    it('should emit an update metadata change', () => {
+      const cell = YCodeCell.create();
+      const metadata = {
+        collapsed: true,
+        editable: false,
+        name: 'cell-name'
+      };
+      cell.metadata = metadata;
+
+      const changes: IMapChange[] = [];
+      cell.setMetadata('test', 'banana');
+
+      cell.metadataChanged.connect((_, c) => {
+        changes.push(c);
+      });
+      cell.setMetadata('test', 'orange');
+
+      expect(changes).toHaveLength(1);
+      expect(changes).toEqual([
+        {
+          type: 'update',
+          key: 'test',
+          newValue: 'orange',
+          oldValue: 'banana'
+        }
+      ]);
+
+      cell.dispose();
     });
   });
 });

@@ -167,6 +167,13 @@ export interface ISharedNotebook extends ISharedDocument {
   readonly nbformat: number;
 
   /**
+   * Delete a metadata notebook.
+   *
+   * @param key The key to delete
+   */
+  deleteMetadata(key: string): void;
+
+  /**
    * Returns some metadata associated with the notebook.
    *
    * If no `key` is provided, it will return all metadata.
@@ -197,6 +204,15 @@ export interface ISharedNotebook extends ISharedDocument {
    * @param value: Metadata's attribute to update.
    */
   updateMetadata(value: Partial<nbformat.INotebookMetadata>): void;
+
+  /**
+   * Add a shared cell at the notebook bottom.
+   *
+   * @param cell Cell to add.
+   *
+   * @returns The added cell.
+   */
+  addCell(cell: SharedCell.Cell): ISharedCell;
 
   /**
    * Get a shared cell by index.
@@ -375,6 +391,13 @@ export interface ISharedBaseCell<
    * @returns Cell id.
    */
   getId(): string;
+
+  /**
+   * Delete a metadata cell.
+   *
+   * @param key The key to delete
+   */
+  deleteMetadata(key: string): void;
 
   /**
    * Returns some metadata associated with the cell.

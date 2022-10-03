@@ -654,20 +654,55 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
   }
 
   /**
-   * Returns the metadata associated with the notebook.
+   * Delete a metadata cell.
    *
-   * @returns Notebook's metadata.
+   * @param key The key to delete
    */
-  getMetadata(): Partial<Metadata> {
-    return JSONExt.deepCopy(this.ymodel.get('metadata'));
+  deleteMetadata(key: string): void {
+    const allMetadata = this.ymodel.get('metadata');
+    delete allMetadata[key];
+    this.setMetadata(allMetadata);
   }
 
   /**
-   * Sets the metadata associated with the notebook.
+   * Returns the metadata associated with the cell.
    *
-   * @param metadata Notebook's metadata.
+   * @param key
+   * @returns Cell metadata.
    */
-  setMetadata(metadata: Partial<Metadata>): void {
+  getMetadata(key?: string): Partial<Metadata> {
+    const metadata = this.ymodel.get('metadata');
+
+    if (typeof key === 'string') {
+      return JSONExt.deepCopy(metadata[key]);
+    } else {
+      return JSONExt.deepCopy(metadata);
+    }
+  }
+
+  /**
+   * Sets some cell metadata.
+   *
+   * If only one argument is provided, it will override all cell metadata.
+   * Otherwise a single key will be set to a new value.
+   *
+   * @param metadata Cell's metadata or key.
+   * @param value Metadata value
+   */
+  setMetadata(
+    metadata: Partial<Metadata> | string,
+    value?: PartialJSONValue
+  ): void {
+    if (typeof metadata === 'string') {
+      if (typeof value === 'undefined') {
+        throw new TypeError(
+          `Metadata value for ${metadata} cannot be 'undefined'.`
+        );
+      }
+      const meta = this.getMetadata();
+      metadata = { ...meta, metadata: value };
+    }
+
     const clone = JSONExt.deepCopy(metadata) as any;
     if (clone.collapsed != null) {
       clone.jupyter = clone.jupyter || {};
@@ -1322,6 +1357,17 @@ export class YNotebook
   }
 
   /**
+   * Add a shared cell at the notebook bottom.
+   *
+   * @param cell Cell to add.
+   *
+   * @returns The added cell.
+   */
+  addCell(cell: SharedCell.Cell): YBaseCell<nbformat.IBaseCellMetadata> {
+    return this.insertCell(this._ycells.length - 1, cell);
+  }
+
+  /**
    * Insert a shared cell into a specific position.
    *
    * @param index: Cell's position.
@@ -1397,6 +1443,17 @@ export class YNotebook
     this.transact(() => {
       this._ycells.delete(from, to - from);
     });
+  }
+
+  /**
+   * Delete a metadata notebook.
+   *
+   * @param key The key to delete
+   */
+  deleteMetadata(key: string): void {
+    const allMetadata = this.ymeta.get('metadata');
+    delete allMetadata[key];
+    this.setMetadata(allMetadata);
   }
 
   /**
