@@ -1267,10 +1267,6 @@ export class YNotebook
    */
   readonly ymeta: Y.Map<any> = this.ydoc.getMap('meta');
   /**
-   * YJS notebook model
-   */
-  readonly ymodel: Y.Map<any> = this.ydoc.getMap('model');
-  /**
    * Cells list
    */
   readonly cells: YCellType[];
