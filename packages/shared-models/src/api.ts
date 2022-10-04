@@ -323,10 +323,6 @@ export namespace SharedCell {
    */
   export interface IOptions {
     /**
-     * Cell id
-     */
-    id?: string;
-    /**
      * Optional notebook to which this cell belongs.
      *
      * If not provided the cell will be standalone.

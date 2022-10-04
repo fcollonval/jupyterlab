@@ -300,66 +300,52 @@ const createCell = (
   cell: SharedCell.Cell,
   notebook?: YNotebook
 ): YCodeCell | YMarkdownCell | YRawCell => {
+  const ymodel = new Y.Map();
+  const ysource = new Y.Text();
+  ymodel.set('source', ysource);
+  ymodel.set('metadata', {});
+  ymodel.set('cell_type', cell.cell_type);
+  ymodel.set('id', cell.id ?? UUID.uuid4());
+
+  let ycell: YCellType;
   switch (cell.cell_type) {
     case 'markdown': {
-      const mCell = cell as Partial<nbformat.IMarkdownCell>;
-      const ycell = YMarkdownCell.create({ id: mCell.id, notebook });
-      if (mCell.source != null) {
-        ycell.setSource(
-          typeof mCell.source === 'string'
-            ? mCell.source
-            : mCell.source.join('\n')
-        );
+      ycell = new YMarkdownCell(ymodel, ysource, { notebook });
+      if (cell.attachments != null) {
+        ycell.setAttachments(cell.attachments as nbformat.IAttachments);
       }
-      if (mCell.metadata != null) {
-        ycell.setMetadata(mCell.metadata);
-      }
-      if (mCell.attachments != null) {
-        ycell.setAttachments(mCell.attachments);
-      }
-      return ycell;
+      break;
     }
     case 'code': {
+      ycell = new YCodeCell(ymodel, ysource, { notebook });
       const cCell = cell as Partial<nbformat.ICodeCell>;
-      const ycell = YCodeCell.create({ id: cCell.id, notebook });
-      if (cCell.source != null) {
-        ycell.setSource(
-          typeof cCell.source === 'string'
-            ? cCell.source
-            : cCell.source.join('\n')
-        );
-      }
-      if (cCell.metadata != null) {
-        ycell.setMetadata(cCell.metadata);
-      }
       if (cCell.execution_count != null) {
         ycell.execution_count = cCell.execution_count;
       }
       if (cCell.outputs) {
         ycell.setOutputs(cCell.outputs);
       }
-      return ycell;
+      break;
     }
     default: {
       // raw
-      const rCell = cell as Partial<nbformat.IRawCell>;
-      const ycell = YRawCell.create({ id: rCell.id, notebook });
-      if (rCell.source != null) {
-        ycell.setSource(
-          typeof rCell.source === 'string'
-            ? rCell.source
-            : rCell.source.join('\n')
-        );
+      ycell = new YRawCell(ymodel, ysource, { notebook });
+      if (cell.attachments) {
+        ycell.setAttachments(cell.attachments as nbformat.IAttachments);
       }
-      if (rCell.metadata != null) {
-        ycell.setMetadata(rCell.metadata);
-      }
-      if (rCell.attachments) {
-        ycell.setAttachments(rCell.attachments);
-      }
-      return ycell;
+      break;
     }
   }
+
+  if (cell.metadata != null) {
+    ycell.setMetadata(cell.metadata);
+  }
+  if (cell.source != null) {
+    ycell.setSource(
+      typeof cell.source === 'string' ? cell.source : cell.source.join('\n')
+    );
+  }
+  return ycell;
 };
 
 /**
@@ -373,31 +359,26 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
   implements ISharedBaseCell<Metadata>, IYText
 {
   /**
-   * Create a new YCell that can be inserted into a YNotebook
-   *
-   * ### Notes
-   * Avoid using this method, you should prefer using `YNotebook.insertCell`.
-   */
-  static create(options: SharedCell.IOptions = {}): YBaseCell<any> {
-    const ymodel = new Y.Map();
-    const ysource = new Y.Text();
-    ymodel.set('source', ysource);
-    ymodel.set('metadata', {});
-    ymodel.set('cell_type', this.prototype.cell_type);
-    ymodel.set('id', options.id ?? UUID.uuid4());
-    return new this(ymodel, ysource, options);
-  }
-
-  /**
    * Create a new YCell that works standalone. It cannot be
    * inserted into a YNotebook because the Yjs model is already
    * attached to an anonymous Y.Doc instance.
    */
   static createStandalone(id?: string): YBaseCell<any> {
-    const cell = this.create({ id });
+    const cell = createCell({ id, cell_type: this.prototype.cell_type });
     return cell;
   }
 
+  /**
+   * Base cell constructor
+   *
+   * ### Notes
+   * Don't use the constructor directly - prefer using ``YNotebook.insertCell``
+   *
+   * The ``ysource`` is needed because ``ymodel.get('source')`` will
+   * not return the real source if the model is not yet attached to
+   * a document. Requesting it explicitly allows to introspect a non-empty
+   * source before the cell is attached to the document.
+   */
   constructor(
     ymodel: Y.Map<any>,
     ysource: Y.Text,
@@ -839,16 +820,6 @@ export class YCodeCell
   implements ISharedCodeCell
 {
   /**
-   * Create a new YCodeCell that can be inserted into a YNotebook
-   *
-   * ### Notes
-   * Avoid using this method, you should prefer using `YNotebook.insertCell`.
-   */
-  static create(options: SharedCell.IOptions = {}): YCodeCell {
-    return super.create(options) as YCodeCell;
-  }
-
-  /**
    * Create a new YCodeCell that works standalone. It cannot be
    * inserted into a YNotebook because the Yjs model is already
    * attached to an anonymous Y.Doc instance.
@@ -857,6 +828,17 @@ export class YCodeCell
     return super.createStandalone(id) as YCodeCell;
   }
 
+  /**
+   * Code cell constructor
+   *
+   * ### Notes
+   * Don't use the constructor directly - prefer using ``YNotebook.insertCell``
+   *
+   * The ``ysource`` is needed because ``ymodel.get('source')`` will
+   * not return the real source if the model is not yet attached to
+   * a document. Requesting it explicitly allows to introspect a non-empty
+   * source before the cell is attached to the document.
+   */
   constructor(
     ymodel: Y.Map<any>,
     ysource: Y.Text,
@@ -1069,16 +1051,6 @@ class YAttachmentCell
  */
 export class YRawCell extends YAttachmentCell implements ISharedRawCell {
   /**
-   * Create a new YRawCell that can be inserted into a YNotebook
-   *
-   * ### Notes
-   * Avoid using this method, you should prefer using `YNotebook.insertCell`.
-   */
-  static create(options: SharedCell.IOptions = {}): YRawCell {
-    return super.create(options) as YRawCell;
-  }
-
-  /**
    * Create a new YRawCell that works standalone. It cannot be
    * inserted into a YNotebook because the Yjs model is already
    * attached to an anonymous Y.Doc instance.
@@ -1115,16 +1087,6 @@ export class YMarkdownCell
   extends YAttachmentCell
   implements ISharedMarkdownCell
 {
-  /**
-   * Create a new YMarkdownCell that can be inserted into a YNotebook
-   *
-   * ### Notes
-   * Avoid using this method, you should prefer using `YNotebook.insertCell`.
-   */
-  static create(options: SharedCell.IOptions = {}): YMarkdownCell {
-    return super.create(options) as any;
-  }
-
   /**
    * Create a new YMarkdownCell that works standalone. It cannot be
    * inserted into a YNotebook because the Yjs model is already
