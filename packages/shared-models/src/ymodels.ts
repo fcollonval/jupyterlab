@@ -153,7 +153,7 @@ export class YDocument<T extends DocumentChange> implements ISharedDocument {
   /**
    * Handle a change to the ystate.
    */
-  protected onStateChanged = (event: Y.YMapEvent<any>) => {
+  protected onStateChanged = (event: Y.YMapEvent<any>): void => {
     const stateChange = new Array<StateChange<any>>();
     event.keysChanged.forEach(key => {
       const change = event.changes.keys.get(key);
@@ -353,7 +353,8 @@ const createCell = (
  *
  * @param cell Cell JSON representation
  */
-export const createStandaloneCell = (cell: SharedCell.Cell) => createCell(cell);
+export const createStandaloneCell = (cell: SharedCell.Cell): YCellType =>
+  createCell(cell);
 
 export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
   implements ISharedBaseCell<Metadata>, IYText
@@ -640,7 +641,7 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
    * @param key The key to delete
    */
   deleteMetadata(key: string): void {
-    const allMetadata = this.ymodel.get('metadata');
+    const allMetadata = JSONExt.deepCopy(this.ymodel.get('metadata'));
     delete allMetadata[key];
     this.setMetadata(allMetadata);
   }
@@ -677,11 +678,13 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
     if (typeof metadata === 'string') {
       if (typeof value === 'undefined') {
         throw new TypeError(
-          `Metadata value for ${metadata} cannot be 'undefined'.`
+          `Metadata value for ${metadata} cannot be 'undefined'; use deleteMetadata.`
         );
       }
-      const meta = this.getMetadata();
-      metadata = { ...meta, metadata: value };
+      const key = metadata;
+      metadata = this.getMetadata();
+      // @ts-expect-error metadata type is changed at runtime.
+      metadata[key] = value;
     }
 
     const clone = JSONExt.deepCopy(metadata) as any;
@@ -754,7 +757,7 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
       const oldValue = metadataChange.oldValue ?? {};
       const oldKeys = Object.keys(oldValue);
       const newKeys = Object.keys(metadataChange.newValue);
-      for (let key of new Set(...oldKeys, ...newKeys)) {
+      for (let key of new Set(oldKeys.concat(newKeys))) {
         if (!oldKeys.includes(key)) {
           this._metadataChanged.emit({
             key,
@@ -767,7 +770,9 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
             oldValue: metadataChange.oldValue[key],
             type: 'remove'
           });
-        } else if (oldValue[key] !== metadataChange.newValue[key]) {
+        } else if (
+          !JSONExt.deepEqual(oldValue[key], metadataChange.newValue[key]!)
+        ) {
           this._metadataChanged.emit({
             key,
             newValue: metadataChange.newValue[key],
@@ -1376,9 +1381,9 @@ export class YNotebook
    */
   moveCell(fromIndex: number, toIndex: number): void {
     this.transact(() => {
-      const fromCell: any = this.getCell(fromIndex).clone();
-      this.deleteCell(fromIndex);
-      this.insertCell(toIndex, fromCell);
+      const fromCell = this.getCell(fromIndex).clone();
+      this._ycells.delete(fromIndex, 1);
+      this._ycells.insert(toIndex, [fromCell.ymodel]);
     });
   }
 
@@ -1398,6 +1403,7 @@ export class YNotebook
    * @param to: The end index of the range to remove (exclusive).
    */
   deleteCellRange(from: number, to: number): void {
+    // Cells will be removed from the mapping in the model event listener.
     this.transact(() => {
       this._ycells.delete(from, to - from);
     });
@@ -1409,7 +1415,7 @@ export class YNotebook
    * @param key The key to delete
    */
   deleteMetadata(key: string): void {
-    const allMetadata = this.ymeta.get('metadata');
+    const allMetadata = JSONExt.deepCopy(this.ymeta.get('metadata'));
     delete allMetadata[key];
     this.setMetadata(allMetadata);
   }
@@ -1449,11 +1455,12 @@ export class YNotebook
     if (typeof metadata === 'string') {
       if (typeof value === 'undefined') {
         throw new TypeError(
-          `Metadata value for ${metadata} cannot be 'undefined'.`
+          `Metadata value for ${metadata} cannot be 'undefined'; use deleteMetadata.`
         );
       }
-      const meta = this.ymeta.get('metadata');
-      this.ymeta.set('metadata', { ...meta, metadata: value });
+      const update: Partial<nbformat.INotebookMetadata> = {};
+      update[metadata] = value;
+      this.updateMetadata(update);
     } else {
       this.ymeta.set('metadata', JSONExt.deepCopy(metadata));
     }
@@ -1483,7 +1490,7 @@ export class YNotebook
       const oldValue = metadataChange.oldValue ?? {};
       const oldKeys = Object.keys(oldValue);
       const newKeys = Object.keys(metadataChange.newValue);
-      for (let key of new Set(...oldKeys, ...newKeys)) {
+      for (let key of new Set(oldKeys.concat(newKeys))) {
         if (!oldKeys.includes(key)) {
           this._metadataChanged.emit({
             key,
@@ -1496,7 +1503,9 @@ export class YNotebook
             oldValue: metadataChange.oldValue[key],
             type: 'remove'
           });
-        } else if (oldValue[key] !== metadataChange.newValue[key]) {
+        } else if (
+          !JSONExt.deepEqual(oldValue[key], metadataChange.newValue[key]!)
+        ) {
           this._metadataChanged.emit({
             key,
             newValue: metadataChange.newValue[key],

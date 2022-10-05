@@ -193,7 +193,7 @@ describe('@jupyterlab/shared-models', () => {
         expect(changes).toHaveLength(1);
         expect(changes).toEqual([
           {
-            type: 'delete',
+            type: 'remove',
             key: 'test',
             newValue: undefined,
             oldValue: 'banana'
@@ -225,7 +225,7 @@ describe('@jupyterlab/shared-models', () => {
         expect(changes).toHaveLength(1);
         expect(changes).toEqual([
           {
-            type: 'update',
+            type: 'change',
             key: 'test',
             newValue: 'orange',
             oldValue: 'banana'
@@ -275,7 +275,9 @@ describe('@jupyterlab/shared-models', () => {
           }
         ]);
       });
+    });
 
+    describe('#deleteCell', () => {
       it('should emit a delete cells change', () => {
         const notebook = YNotebook.create();
         const changes: IListChange[] = [];
@@ -289,7 +291,7 @@ describe('@jupyterlab/shared-models', () => {
         expect(changes).toHaveLength(1);
         expect(changes).toEqual([
           {
-            type: 'delete',
+            type: 'remove',
             oldIndex: 0,
             oldValues: [codeCell],
             newIndex: -1,
@@ -297,11 +299,14 @@ describe('@jupyterlab/shared-models', () => {
           }
         ]);
       });
+    });
 
+    describe('#moveCell', () => {
       it('should emit add and delete cells changes when moving a cell', () => {
         const notebook = YNotebook.create();
         const changes: IListChange[] = [];
         const codeCell = notebook.addCell({ cell_type: 'code' });
+        console.log(codeCell);
         notebook.addCell({ cell_type: 'markdown' });
 
         notebook.cellsChanged.connect((_, c) => {
@@ -312,7 +317,7 @@ describe('@jupyterlab/shared-models', () => {
         expect(changes).toHaveLength(2);
         expect(changes).toEqual([
           {
-            type: 'delete',
+            type: 'remove',
             oldIndex: 0,
             oldValues: [codeCell],
             newIndex: -1,
@@ -345,7 +350,7 @@ describe('@jupyterlab/shared-models', () => {
     });
 
     it('should get metadata', () => {
-      const cell = YCodeCell.create();
+      const cell = YCodeCell.createStandalone();
       const metadata = {
         collapsed: true,
         editable: false,
@@ -354,24 +359,27 @@ describe('@jupyterlab/shared-models', () => {
 
       cell.setMetadata(metadata);
 
-      expect(cell.metadata).toEqual(metadata);
+      expect(cell.metadata).toEqual({
+        ...metadata,
+        jupyter: { outputs_hidden: true }
+      });
     });
 
     it('should get all metadata', () => {
-      const cell = YCodeCell.create();
+      const cell = YCodeCell.createStandalone();
       const metadata = {
-        collapsed: true,
+        jupyter: { outputs_hidden: true },
         editable: false,
         name: 'cell-name'
       };
 
       cell.setMetadata(metadata);
 
-      expect(cell.getMetadata()).toEqual(metadata);
+      expect(cell.getMetadata()).toEqual({ ...metadata, collapsed: true });
     });
 
     it('should get one metadata', () => {
-      const cell = YCodeCell.create();
+      const cell = YCodeCell.createStandalone();
       const metadata = {
         collapsed: true,
         editable: false,
@@ -384,7 +392,7 @@ describe('@jupyterlab/shared-models', () => {
     });
 
     it('should set one metadata', () => {
-      const cell = YCodeCell.create();
+      const cell = YCodeCell.createStandalone();
       const metadata = {
         collapsed: true,
         editable: false,
@@ -437,7 +445,7 @@ describe('@jupyterlab/shared-models', () => {
     });
 
     it('should emit a add metadata change', () => {
-      const cell = YCodeCell.create();
+      const cell = YCodeCell.createStandalone();
       const metadata = {
         collapsed: true,
         editable: false,
@@ -460,7 +468,7 @@ describe('@jupyterlab/shared-models', () => {
     });
 
     it('should emit a delete metadata change', () => {
-      const cell = YCodeCell.create();
+      const cell = YCodeCell.createStandalone();
       const metadata = {
         collapsed: true,
         editable: false,
@@ -479,7 +487,7 @@ describe('@jupyterlab/shared-models', () => {
       expect(changes).toHaveLength(1);
       expect(changes).toEqual([
         {
-          type: 'delete',
+          type: 'remove',
           key: 'test',
           newValue: undefined,
           oldValue: 'banana'
@@ -490,7 +498,7 @@ describe('@jupyterlab/shared-models', () => {
     });
 
     it('should emit an update metadata change', () => {
-      const cell = YCodeCell.create();
+      const cell = YCodeCell.createStandalone();
       const metadata = {
         collapsed: true,
         editable: false,
@@ -509,7 +517,7 @@ describe('@jupyterlab/shared-models', () => {
       expect(changes).toHaveLength(1);
       expect(changes).toEqual([
         {
-          type: 'update',
+          type: 'change',
           key: 'test',
           newValue: 'orange',
           oldValue: 'banana'
