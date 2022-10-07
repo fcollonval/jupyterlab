@@ -1611,11 +1611,8 @@ describe('@jupyterlab/notebook', () => {
       });
 
       it('should replace an existing header', () => {
-        console.log(widget.activeCell!.model.sharedModel.toJSON());
         widget.activeCell!.model.sharedModel.setSource('# foo');
-        console.log(widget.activeCell!.model.sharedModel.toJSON());
         NotebookActions.setMarkdownHeader(widget, 2);
-        console.log(widget.activeCell!.model.sharedModel.toJSON());
         expect(widget.activeCell!.model.sharedModel.getSource()).toBe('## foo');
       });
 
