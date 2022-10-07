@@ -20,6 +20,7 @@ import {
 import { signalToPromise } from '@jupyterlab/coreutils';
 import * as nbformat from '@jupyterlab/nbformat';
 import { KernelMessage } from '@jupyterlab/services';
+import { ISharedAttachmentsCell } from '@jupyterlab/shared-models';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 import { every, findIndex } from '@lumino/algorithm';
 import { JSONExt, JSONObject } from '@lumino/coreutils';
@@ -2366,19 +2367,24 @@ namespace Private {
   ): void {
     const notebookSharedModel = notebook.model!.sharedModel;
     notebook.widgets.forEach((child, index) => {
-      notebookSharedModel.transact(() => {
-        if (!notebook.isSelectedOrActive(child)) {
-          return;
-        }
-        if (child.model.type !== value) {
+      if (!notebook.isSelectedOrActive(child)) {
+        return;
+      }
+      if (child.model.type !== value) {
+        const raw = child.model.toJSON();
+        notebookSharedModel.transact(() => {
           notebookSharedModel.deleteCell(index);
-          notebookSharedModel.insertCell(index, {
+          const newCell = notebookSharedModel.insertCell(index, {
             cell_type: value,
-            source: child.model.sharedModel.getSource(),
-            metadata: child.model.sharedModel.getMetadata()
+            source: raw.source,
+            metadata: raw.metadata
           });
-        }
-      });
+          if (raw.attachments && ['markdown', 'raw'].includes(value)) {
+            (newCell as ISharedAttachmentsCell).attachments =
+              raw.attachments as nbformat.IAttachments;
+          }
+        });
+      }
       if (value === 'markdown') {
         // Fetch the new widget and unrender it.
         child = notebook.widgets[index];
