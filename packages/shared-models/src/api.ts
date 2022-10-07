@@ -377,11 +377,6 @@ export interface ISharedBaseCell<
   readonly notebook: ISharedNotebook | null;
 
   /**
-   * Create a new Cell that can be inserted into a YNotebook.
-   */
-  clone(): ISharedBaseCell<Metadata>;
-
-  /**
    * Get Cell id.
    *
    * @returns Cell id.
@@ -586,19 +581,9 @@ export type ListChangeType =
   | 'add'
 
   /**
-   * An item was moved within the list.
-   */
-  | 'move'
-
-  /**
    * Item(s) were removed from the list.
    */
-  | 'remove'
-
-  /**
-   * An item was set in the list.
-   */
-  | 'set';
+  | 'remove';
 
 /**
  * The changed object which is emitted by a list.

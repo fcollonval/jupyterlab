@@ -289,6 +289,7 @@ describe('@jupyterlab/shared-models', () => {
         notebook.deleteCell(0);
 
         expect(changes).toHaveLength(1);
+        expect(codeCell.isDisposed).toEqual(true);
         expect(changes).toEqual([
           {
             type: 'remove',
@@ -306,19 +307,21 @@ describe('@jupyterlab/shared-models', () => {
         const notebook = YNotebook.create();
         const changes: IListChange[] = [];
         const codeCell = notebook.addCell({ cell_type: 'code' });
-        console.log(codeCell);
         notebook.addCell({ cell_type: 'markdown' });
-
+        const raw = codeCell.toJSON();
         notebook.cellsChanged.connect((_, c) => {
           changes.push(c);
         });
         notebook.moveCell(0, 1);
 
+        expect(notebook.getCell(1)).not.toEqual(codeCell);
+        expect(notebook.getCell(1).toJSON()).toEqual(raw);
         expect(changes).toHaveLength(2);
         expect(changes).toEqual([
           {
             type: 'remove',
             oldIndex: 0,
+            // The id is already gone as the cell is disposed
             oldValues: [codeCell],
             newIndex: -1,
             newValues: []
@@ -326,7 +329,7 @@ describe('@jupyterlab/shared-models', () => {
           {
             type: 'add',
             newIndex: 1,
-            newValues: [codeCell],
+            newValues: [notebook.getCell(1)],
             oldIndex: -2,
             oldValues: []
           }

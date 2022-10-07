@@ -278,7 +278,12 @@ const createCellModelFromSharedType = (
 ): YCellType => {
   switch (type.get('cell_type')) {
     case 'code':
-      return new YCodeCell(type, type.get('source'), options);
+      return new YCodeCell(
+        type,
+        type.get('source'),
+        type.get('outputs'),
+        options
+      );
     case 'markdown':
       return new YMarkdownCell(type, type.get('source'), options);
     case 'raw':
@@ -298,7 +303,8 @@ const createCellModelFromSharedType = (
  */
 const createCell = (
   cell: SharedCell.Cell,
-  notebook?: YNotebook
+  notebook?: YNotebook,
+  undoManager?: Y.UndoManager
 ): YCodeCell | YMarkdownCell | YRawCell => {
   const ymodel = new Y.Map();
   const ysource = new Y.Text();
@@ -310,18 +316,21 @@ const createCell = (
   let ycell: YCellType;
   switch (cell.cell_type) {
     case 'markdown': {
-      ycell = new YMarkdownCell(ymodel, ysource, { notebook });
+      ycell = new YMarkdownCell(ymodel, ysource, { notebook, undoManager });
       if (cell.attachments != null) {
         ycell.setAttachments(cell.attachments as nbformat.IAttachments);
       }
       break;
     }
     case 'code': {
-      ycell = new YCodeCell(ymodel, ysource, { notebook });
+      const youtputs = new Y.Array();
+      ymodel.set('outputs', youtputs);
+      ycell = new YCodeCell(ymodel, ysource, youtputs, {
+        notebook,
+        undoManager
+      });
       const cCell = cell as Partial<nbformat.ICodeCell>;
-      if (cCell.execution_count != null) {
-        ycell.execution_count = cCell.execution_count;
-      }
+      ycell.execution_count = cCell.execution_count ?? null;
       if (cCell.outputs) {
         ycell.setOutputs(cCell.outputs);
       }
@@ -329,7 +338,7 @@ const createCell = (
     }
     default: {
       // raw
-      ycell = new YRawCell(ymodel, ysource, { notebook });
+      ycell = new YRawCell(ymodel, ysource, { notebook, undoManager });
       if (cell.attachments) {
         ycell.setAttachments(cell.attachments as nbformat.IAttachments);
       }
@@ -379,11 +388,15 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
    * not return the real source if the model is not yet attached to
    * a document. Requesting it explicitly allows to introspect a non-empty
    * source before the cell is attached to the document.
+   *
+   * @param ymodel Cell map
+   * @param ysource Cell source
+   * @param options { notebook?: The notebook the cell is attached to, undoManager?: The cell undo manager (use this only if cloning a cell when moving it)}
    */
   constructor(
     ymodel: Y.Map<any>,
     ysource: Y.Text,
-    options: SharedCell.IOptions = {}
+    options: SharedCell.IOptions & { undoManager?: Y.UndoManager } = {}
   ) {
     this.ymodel = ymodel;
     this._ysource = ysource;
@@ -393,12 +406,12 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
     this._undoManager = null;
     if (options.notebook) {
       this._notebook = options.notebook as YNotebook;
-      this._undoManager = this._notebook.disableDocumentWideUndoRedo
-        ? new Y.UndoManager([this.ymodel], {
-            trackedOrigins: new Set([this])
-          })
-        : this._notebook.undoManager;
+      // We cannot create a undo manager with the cell not yet attached in the notebook
+      // so we defer that to the notebook insertCell method
+      // The only exception is when moving a cell as we need to recreate a cell while preserving the undo history
+      this._undoManager = options.undoManager ?? null;
     } else {
+      // Standalone cell
       const doc = new Y.Doc();
       doc.getArray().insert(0, [this.ymodel]);
       this._awareness = new Awareness(doc);
@@ -501,8 +514,23 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
       ? this._undoManager
       : this.notebook.undoManager;
   }
-  set undoManager(undoManager: Y.UndoManager | null) {
-    this._undoManager = undoManager;
+
+  /**
+   * Defer setting the undo manager as it requires the
+   * cell to be attached to the notebook Y document.
+   */
+  setUndoManager(): void {
+    if (this._undoManager) {
+      throw new Error('The cell undo manager is already set.');
+    }
+
+    if (this._notebook) {
+      this._undoManager = this._notebook.disableDocumentWideUndoRedo
+        ? new Y.UndoManager([this.ymodel], {
+            trackedOrigins: new Set([this])
+          })
+        : this._notebook.undoManager;
+    }
   }
 
   readonly ymodel: Y.Map<any>;
@@ -533,24 +561,6 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
   }
 
   /**
-   * Clone the cell.
-   */
-  clone(): YBaseCell<any> {
-    const ymodel = new Y.Map();
-    const ysource = new Y.Text(this.getSource());
-    ymodel.set('source', ysource);
-    ymodel.set('metadata', this.getMetadata());
-    ymodel.set('cell_type', this.cell_type);
-    ymodel.set('id', UUID.uuid4());
-    const Self: any = this.constructor;
-    const clone = new Self(ymodel, ysource);
-    // TODO The assignment of the undoManager does not work for a clone.
-    // See https://github.com/jupyterlab/jupyterlab/issues/11035
-    clone._undoManager = this.undoManager;
-    return clone;
-  }
-
-  /**
    * Undo an operation.
    */
   undo(): void {
@@ -578,7 +588,7 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
       this._awareness.destroy();
       doc.destroy();
     }
-    if (!this.notebook && this._undoManager) {
+    if (this._undoManager) {
       this._undoManager.destroy();
     }
     Signal.clearData(this);
@@ -708,6 +718,7 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
    * Serialize the model to JSON.
    */
   toJSON(): nbformat.IBaseCell {
+    // console.log(this.ymodel.get('id'))
     return {
       id: this.getId(),
       cell_type: this.cell_type,
@@ -843,16 +854,20 @@ export class YCodeCell
    * not return the real source if the model is not yet attached to
    * a document. Requesting it explicitly allows to introspect a non-empty
    * source before the cell is attached to the document.
+   *
+   * @param ymodel Cell map
+   * @param ysource Cell source
+   * @param youtputs Code cell outputs
+   * @param options { notebook?: The notebook the cell is attached to, undoManager?: The cell undo manager (use this only if cloning a cell when moving it)}
    */
   constructor(
     ymodel: Y.Map<any>,
     ysource: Y.Text,
-    options: SharedCell.IOptions = {}
+    youtputs: Y.Array<any>,
+    options: SharedCell.IOptions & { undoManager?: Y.UndoManager } = {}
   ) {
     super(ymodel, ysource, options);
-    this._youtputs = new Y.Array();
-    this.ymodel.set('execution_count', null); // for some default value
-    this.ymodel.set('outputs', this._youtputs);
+    this._youtputs = youtputs;
   }
 
   /**
@@ -926,25 +941,12 @@ export class YCodeCell
   }
 
   /**
-   * Create a new YCodeCell that can be inserted into a YNotebook
-   */
-  clone(): YCodeCell {
-    const cell = super.clone() as YCodeCell;
-    cell._youtputs.insert(0, this.getOutputs());
-    cell.ymodel.set('execution_count', this.execution_count); // for some default value
-    cell.ymodel.set('outputs', cell._youtputs);
-    return cell as any;
-  }
-
-  /**
    * Serialize the model to JSON.
    */
   toJSON(): nbformat.ICodeCell {
+    // console.log(super.toJSON())
     return {
-      id: this.getId(),
-      cell_type: 'code',
-      source: this.getSource(),
-      metadata: this.getMetadata(),
+      ...(super.toJSON() as nbformat.ICodeCell),
       outputs: this.getOutputs(),
       execution_count: this.execution_count
     };
@@ -1370,6 +1372,10 @@ export class YNotebook
       );
     });
 
+    yCells.forEach(c => {
+      c.setUndoManager();
+    });
+
     return yCells;
   }
 
@@ -1381,9 +1387,14 @@ export class YNotebook
    */
   moveCell(fromIndex: number, toIndex: number): void {
     this.transact(() => {
-      const fromCell = this.getCell(fromIndex).clone();
+      const fromCell = this.getCell(fromIndex);
+      const clone = createCell(
+        fromCell.toJSON(),
+        this,
+        this.disableDocumentWideUndoRedo ? fromCell.undoManager! : undefined
+      );
       this._ycells.delete(fromIndex, 1);
-      this._ycells.insert(toIndex, [fromCell.ymodel]);
+      this._ycells.insert(toIndex, [clone.ymodel]);
     });
   }
 
@@ -1547,10 +1558,9 @@ export class YNotebook
     event.changes.added.forEach(item => {
       const type = (item.content as Y.ContentType).type as Y.Map<any>;
       if (!this._ycellMapping.has(type)) {
-        this._ycellMapping.set(
-          type,
-          createCellModelFromSharedType(type, { notebook: this })
-        );
+        const c = createCellModelFromSharedType(type, { notebook: this });
+        c!.setUndoManager();
+        this._ycellMapping.set(type, c);
       }
     });
     event.changes.deleted.forEach(item => {
@@ -1586,6 +1596,7 @@ export class YNotebook
       } else if (d.delete != null) {
         cellsChange.push(d);
         const oldValues = this.cells.splice(index, d.delete);
+        // console.log(JSON.stringify(oldValues, undefined, 2))
 
         this._cellsChanged.emit({
           type: 'remove',
