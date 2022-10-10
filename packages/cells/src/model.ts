@@ -718,7 +718,7 @@ export class CodeCellModel extends CellModel implements ICodeCellModel {
     super.onSharedModelChanged(sender, change);
     globalModelDBMutex(() => {
       if (change.outputsChange) {
-        this.clearExecution();
+        this.outputs.clear();
         sender.getOutputs().forEach(output => this._outputs.add(output));
       }
     });

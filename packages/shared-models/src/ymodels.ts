@@ -880,7 +880,11 @@ export class YCodeCell
     return this.ymodel.get('execution_count') || null;
   }
   set execution_count(count: number | null) {
-    if (this.execution_count !== count) {
+    // Do not use `this.execution_count`. When initializing the
+    // cell, we need to set execution_count to `null` if we compare
+    // using `this.execution_count` it will return `null` and we will
+    // never initialize it
+    if (this.ymodel.get('execution_count') !== count) {
       this.transact(() => {
         this.ymodel.set('execution_count', count);
       });
