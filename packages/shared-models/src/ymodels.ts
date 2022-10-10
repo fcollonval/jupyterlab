@@ -714,7 +714,6 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
    * Serialize the model to JSON.
    */
   toJSON(): nbformat.IBaseCell {
-    // console.log(this.ymodel.get('id'))
     return {
       id: this.getId(),
       cell_type: this.cell_type,
@@ -944,7 +943,6 @@ export class YCodeCell
    * Serialize the model to JSON.
    */
   toJSON(): nbformat.ICodeCell {
-    // console.log(super.toJSON())
     return {
       ...(super.toJSON() as nbformat.ICodeCell),
       outputs: this.getOutputs(),
@@ -1592,7 +1590,6 @@ export class YNotebook
       } else if (d.delete != null) {
         cellsChange.push(d);
         const oldValues = this.cells.splice(index, d.delete);
-        // console.log(JSON.stringify(oldValues, undefined, 2))
 
         this._cellsChanged.emit({
           type: 'remove',
