@@ -303,8 +303,7 @@ const createCellModelFromSharedType = (
  */
 const createCell = (
   cell: SharedCell.Cell,
-  notebook?: YNotebook,
-  undoManager?: Y.UndoManager
+  notebook?: YNotebook
 ): YCodeCell | YMarkdownCell | YRawCell => {
   const ymodel = new Y.Map();
   const ysource = new Y.Text();
@@ -316,7 +315,7 @@ const createCell = (
   let ycell: YCellType;
   switch (cell.cell_type) {
     case 'markdown': {
-      ycell = new YMarkdownCell(ymodel, ysource, { notebook, undoManager });
+      ycell = new YMarkdownCell(ymodel, ysource, { notebook });
       if (cell.attachments != null) {
         ycell.setAttachments(cell.attachments as nbformat.IAttachments);
       }
@@ -326,8 +325,7 @@ const createCell = (
       const youtputs = new Y.Array();
       ymodel.set('outputs', youtputs);
       ycell = new YCodeCell(ymodel, ysource, youtputs, {
-        notebook,
-        undoManager
+        notebook
       });
       const cCell = cell as Partial<nbformat.ICodeCell>;
       ycell.execution_count = cCell.execution_count ?? null;
@@ -338,7 +336,7 @@ const createCell = (
     }
     default: {
       // raw
-      ycell = new YRawCell(ymodel, ysource, { notebook, undoManager });
+      ycell = new YRawCell(ymodel, ysource, { notebook });
       if (cell.attachments) {
         ycell.setAttachments(cell.attachments as nbformat.IAttachments);
       }
@@ -391,12 +389,12 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
    *
    * @param ymodel Cell map
    * @param ysource Cell source
-   * @param options { notebook?: The notebook the cell is attached to, undoManager?: The cell undo manager (use this only if cloning a cell when moving it)}
+   * @param options { notebook?: The notebook the cell is attached to }
    */
   constructor(
     ymodel: Y.Map<any>,
     ysource: Y.Text,
-    options: SharedCell.IOptions & { undoManager?: Y.UndoManager } = {}
+    options: SharedCell.IOptions = {}
   ) {
     this.ymodel = ymodel;
     this._ysource = ysource;
@@ -408,8 +406,6 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
       this._notebook = options.notebook as YNotebook;
       // We cannot create a undo manager with the cell not yet attached in the notebook
       // so we defer that to the notebook insertCell method
-      // The only exception is when moving a cell as we need to recreate a cell while preserving the undo history
-      this._undoManager = options.undoManager ?? null;
     } else {
       // Standalone cell
       const doc = new Y.Doc();
@@ -858,13 +854,13 @@ export class YCodeCell
    * @param ymodel Cell map
    * @param ysource Cell source
    * @param youtputs Code cell outputs
-   * @param options { notebook?: The notebook the cell is attached to, undoManager?: The cell undo manager (use this only if cloning a cell when moving it)}
+   * @param options { notebook?: The notebook the cell is attached to }
    */
   constructor(
     ymodel: Y.Map<any>,
     ysource: Y.Text,
     youtputs: Y.Array<any>,
-    options: SharedCell.IOptions & { undoManager?: Y.UndoManager } = {}
+    options: SharedCell.IOptions = {}
   ) {
     super(ymodel, ysource, options);
     this._youtputs = youtputs;
@@ -1387,12 +1383,8 @@ export class YNotebook
    */
   moveCell(fromIndex: number, toIndex: number): void {
     this.transact(() => {
-      const fromCell = this.getCell(fromIndex);
-      const clone = createCell(
-        fromCell.toJSON(),
-        this,
-        this.disableDocumentWideUndoRedo ? fromCell.undoManager! : undefined
-      );
+      // FIXME we need to use yjs move feature to preserve undo history
+      const clone = createCell(this.getCell(fromIndex).toJSON(), this);
       this._ycells.delete(fromIndex, 1);
       this._ycells.insert(toIndex, [clone.ymodel]);
     });
