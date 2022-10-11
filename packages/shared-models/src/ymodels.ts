@@ -584,7 +584,7 @@ export class YBaseCell<Metadata extends nbformat.IBaseCellMetadata>
       this._awareness.destroy();
       doc.destroy();
     }
-    if (this._undoManager) {
+    if (!this.notebook && this._undoManager) {
       this._undoManager.destroy();
     }
     Signal.clearData(this);
