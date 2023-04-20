@@ -66,14 +66,16 @@ export function displayShortcuts(options: IOptions) {
       const container: JSX.Element[] = [];
       for (const ch of key.split(' ')) {
         container.push(
-          <span className={SHORTCUT_KEY_CLASS}>
+          <span key={ch} className={SHORTCUT_KEY_CLASS}>
             <kbd>{ch}</kbd>
           </span>,
-          <> + </>
+          <React.Fragment key={`plus-${ch}`}> + </React.Fragment>
         );
       }
-      /*topContainer.push(<span>{container.slice(0, -1)}</span>, <>,</>);*/
-      topContainer.push(<span>{container.slice(0, -1)}</span>, <> + </>);
+      topContainer.push(
+        <span key={key}>{container.slice(0, -1)}</span>,
+        <> + </>
+      );
     }
     return <span>{topContainer.slice(0, -1)}</span>;
   }
@@ -169,7 +171,12 @@ export function displayShortcuts(options: IOptions) {
           </tr>
         ))
       );
-      bindingTable.push(<tr className={SHORTCUT_TABLE_LAST_ROW_CLASS}></tr>);
+      bindingTable.push(
+        <tr
+          className={SHORTCUT_TABLE_LAST_ROW_CLASS}
+          key={`distance-${d}`}
+        ></tr>
+      );
     }
   }
 
