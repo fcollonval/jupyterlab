@@ -270,7 +270,7 @@ function Item(props: {
             translator={translator}
             collapseToggled={props.collapseToggled}
           />
-        )}        
+        )}
       </TreeItem>
     </>
   );
