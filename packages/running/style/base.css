@@ -21,6 +21,7 @@
   /* This is needed so that all font sizing of children done in ems is
    * relative to this base size */
   font-size: var(--jp-ui-font-size1);
+  overflow: hidden;
 }
 
 .jp-RunningSessions > .jp-SidePanel-toolbar::part(positioning-region) {
@@ -58,6 +59,7 @@
   gap: 8px;
   justify-content: space-between;
   flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .jp-RunningSessions-item:hover {
@@ -185,13 +187,13 @@ span.jp-RunningSessions-icon > svg {
   border-radius: 0;
   margin: 0;
   flex-shrink: 0;
-  visibility: visible; 
+  visibility: hidden; 
   display: block;
   margin-left: auto;
 }
 
 .jp-RunningSessions-item:not(:hover) .jp-RunningSessions-itemShutdown {
-  visibility: hidden;
+  visibility: visible;
 }
 
 .jp-RunningSessions-sectionList
