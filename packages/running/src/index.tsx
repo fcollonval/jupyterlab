@@ -231,12 +231,6 @@ function Item(props: {
   if (runningItem.className) {
     classList.push(runningItem.className);
   }
-  if (props.child) {
-    classList.push('jp-mod-running-child');
-  }
-  if (props.child && !children) {
-    classList.push('jp-mod-running-leaf');
-  }
 
   return (
     <>
@@ -244,7 +238,7 @@ function Item(props: {
         className={classList.join(' ')}
         onClick={onClick}
         data-context={runningItem.context || ''}
-        expanded={collapsed}
+        expanded={!collapsed}
       >     
           {icon ? (
             typeof icon === 'string' ? (
