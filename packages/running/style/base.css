@@ -51,7 +51,13 @@
   color: var(--jp-ui-font-color1);
   height: var(--jp-private-running-item-height);
   line-height: var(--jp-private-running-item-height);
-  padding: 0 8px;
+  /* padding: 0 8px; */
+  align-items: center;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--jp-border-color2);
+  gap: 8px;
+  justify-content: space-between;
+  flex-wrap: nowrap;
 }
 
 .jp-RunningSessions-item:hover {
@@ -103,7 +109,11 @@
 }
 
 .jp-RunningSessions-icon {
-  margin: 0 4px;
+  /* margin: 0 4px; */
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  flex-shrink: 0;
 }
 
 .jp-RunningSessions-toolbar {
@@ -133,11 +143,14 @@ span.jp-RunningSessions-icon > svg {
 
 .jp-RunningSessions-itemLabel {
   font-size: var(--jp-ui-font-size1);
-  flex: 1 1 55%;
+  /* flex: 1 1 55%; */
   padding: 0 4px;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+  flex-grow: 1;
+  flex: 1;
+  margin-right: 8px;
 }
 
 .jp-RunningSessions-itemLabel:focus {
@@ -145,12 +158,16 @@ span.jp-RunningSessions-icon > svg {
 }
 
 .jp-RunningSessions-itemDetail {
-  font-size: var(--jp-ui-font-size1);
+  /* font-size: var(--jp-ui-font-size1); */
   flex: 1 1 45%;
   padding: 0 4px;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+  flex-shrink: 0; /* Prevents shrinking */
+  color: var(--jp-ui-font-color2); /* Dimmed color for less important text */
+  font-size: var(--jp-ui-font-size0); /* Smaller font size for details */
+  margin-left: auto; /* Pushes to the far right */
 }
 
 .jp-RunningSessions-caret {
@@ -167,6 +184,10 @@ span.jp-RunningSessions-icon > svg {
 .jp-RunningSessions-item .jp-RunningSessions-itemShutdown {
   border-radius: 0;
   margin: 0;
+  flex-shrink: 0;
+  visibility: visible; 
+  display: block;
+  margin-left: auto;
 }
 
 .jp-RunningSessions-item:not(:hover) .jp-RunningSessions-itemShutdown {

@@ -12,8 +12,6 @@ import {
   TranslationBundle
 } from '@jupyterlab/translation';
 import {
-  caretDownIcon,
-  caretRightIcon,
   closeIcon,
   collapseAllIcon,
   expandAllIcon,
@@ -31,6 +29,7 @@ import {
   treeViewIcon,
   UseSignal
 } from '@jupyterlab/ui-components';
+import {TreeView, TreeItem} from '@jupyter/react-components'
 import { IStateDB } from '@jupyterlab/statedb';
 import { Token } from '@lumino/coreutils';
 import { DisposableDelegate, IDisposable } from '@lumino/disposable';
@@ -61,11 +60,6 @@ const SECTION_CLASS = 'jp-RunningSessions-section';
 const CONTAINER_CLASS = 'jp-RunningSessions-sectionContainer';
 
 /**
- * The class name added to the running kernel sessions section list.
- */
-const LIST_CLASS = 'jp-RunningSessions-sectionList';
-
-/**
  * The class name added to the running sessions items.
  */
 const ITEM_CLASS = 'jp-RunningSessions-item';
@@ -89,11 +83,6 @@ const SHUTDOWN_BUTTON_CLASS = 'jp-RunningSessions-itemShutdown';
  * The class name added to a running session item shutdown button.
  */
 const SHUTDOWN_ALL_BUTTON_CLASS = 'jp-RunningSessions-shutdownAll';
-
-/**
- * The class name added to a collapse/expand carets.
- */
-const CARET_CLASS = 'jp-RunningSessions-caret';
 
 /**
  * The class name added to icons.
@@ -251,18 +240,12 @@ function Item(props: {
 
   return (
     <>
-      <li>
-        <div
-          className={classList.join(' ')}
-          onClick={onClick}
-          data-context={runningItem.context || ''}
-        >
-          {collapsible &&
-            (collapsed ? (
-              <caretRightIcon.react tag="span" className={CARET_CLASS} />
-            ) : (
-              <caretDownIcon.react tag="span" className={CARET_CLASS} />
-            ))}
+      <TreeItem
+        className={classList.join(' ')}
+        onClick={onClick}
+        data-context={runningItem.context || ''}
+        expanded={collapsed}
+      >     
           {icon ? (
             typeof icon === 'string' ? (
               <img src={icon} className={ITEM_ICON_CLASS} />
@@ -286,17 +269,15 @@ function Item(props: {
               tooltip={shutdownLabel}
             />
           )}
-        </div>
-        {collapsible && !collapsed && (
+        {children && (
           <List
-            child={true}
             runningItems={children!}
             shutdownItemIcon={shutdownItemIcon}
             translator={translator}
             collapseToggled={props.collapseToggled}
           />
-        )}
-      </li>
+        )}        
+      </TreeItem>
     </>
   );
 }
@@ -309,6 +290,7 @@ function List(props: {
   filter?: (item: IRunningSessions.IRunningItem) => Partial<IScore> | null;
   translator?: ITranslator;
   collapseToggled: ISignal<Section, boolean>;
+  expanded?: boolean;
 }) {
   const filter = props.filter;
   const items = filter
@@ -326,7 +308,7 @@ function List(props: {
         .map(({ item }) => item)
     : props.runningItems;
   return (
-    <ul className={LIST_CLASS}>
+    <>
       {items.map((item, i) => (
         <Item
           child={props.child}
@@ -338,7 +320,7 @@ function List(props: {
           collapseToggled={props.collapseToggled}
         />
       ))}
-    </ul>
+    </>
   );
 }
 
@@ -456,14 +438,16 @@ class ListWidget extends ReactWidget {
           }
           return (
             <div className={CONTAINER_CLASS}>
-              <List
-                runningItems={options.runningItems}
-                shutdownLabel={options.manager.shutdownLabel}
-                shutdownItemIcon={options.manager.shutdownItemIcon}
-                filter={options.filterProvider?.filter}
-                translator={options.translator}
-                collapseToggled={options.collapseToggled}
-              />
+              <TreeView>
+                <List
+                  runningItems={options.runningItems}
+                  shutdownLabel={options.manager.shutdownLabel}
+                  shutdownItemIcon={options.manager.shutdownItemIcon}
+                  filter={options.filterProvider?.filter}
+                  translator={options.translator}
+                  collapseToggled={options.collapseToggled}
+                />
+              </TreeView>
             </div>
           );
         }}
