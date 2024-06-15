@@ -163,8 +163,8 @@ span.jp-RunningSessions-icon > svg {
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
-  flex-shrink: 0; 
-  color: var(--jp-ui-font-color2); 
+  flex-shrink: 0;
+  color: var(--jp-ui-font-color2);
   font-size: var(--jp-ui-font-size0);
   margin-left: auto;
 }
@@ -184,7 +184,7 @@ span.jp-RunningSessions-icon > svg {
   border-radius: 0;
   margin: 0;
   flex-shrink: 0;
-  visibility: hidden; 
+  visibility: hidden;
   display: block;
   margin-left: auto;
 }

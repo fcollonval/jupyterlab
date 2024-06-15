@@ -245,7 +245,7 @@ function Item(props: {
         onClick={onClick}
         data-context={runningItem.context || ''}
         expanded={collapsed}
-      >     
+      >
           {icon ? (
             typeof icon === 'string' ? (
               <img src={icon} className={ITEM_ICON_CLASS} />
@@ -276,7 +276,7 @@ function Item(props: {
             translator={translator}
             collapseToggled={props.collapseToggled}
           />
-        )}        
+        )}
       </TreeItem>
     </>
   );
