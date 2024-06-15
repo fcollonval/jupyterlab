@@ -52,7 +52,6 @@
   color: var(--jp-ui-font-color1);
   height: var(--jp-private-running-item-height);
   line-height: var(--jp-private-running-item-height);
-  /* padding: 0 8px; */
   align-items: center;
   padding: 4px 12px;
   border-bottom: 1px solid var(--jp-border-color2);
@@ -145,7 +144,6 @@ span.jp-RunningSessions-icon > svg {
 
 .jp-RunningSessions-itemLabel {
   font-size: var(--jp-ui-font-size1);
-  /* flex: 1 1 55%; */
   padding: 0 4px;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -160,16 +158,15 @@ span.jp-RunningSessions-icon > svg {
 }
 
 .jp-RunningSessions-itemDetail {
-  /* font-size: var(--jp-ui-font-size1); */
   flex: 1 1 45%;
   padding: 0 4px;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
-  flex-shrink: 0; /* Prevents shrinking */
-  color: var(--jp-ui-font-color2); /* Dimmed color for less important text */
-  font-size: var(--jp-ui-font-size0); /* Smaller font size for details */
-  margin-left: auto; /* Pushes to the far right */
+  flex-shrink: 0; 
+  color: var(--jp-ui-font-color2); 
+  font-size: var(--jp-ui-font-size0);
+  margin-left: auto;
 }
 
 .jp-RunningSessions-caret {
