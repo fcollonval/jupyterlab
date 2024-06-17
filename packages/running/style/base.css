@@ -45,15 +45,6 @@
   padding-left: 14px;
 }
 
-.jp-RunningSessions-item {
-  display: flex;
-  flex-direction: row;
-  color: var(--jp-ui-font-color1);
-  height: var(--jp-private-running-item-height);
-  line-height: var(--jp-private-running-item-height);
-  padding: 0 8px;
-}
-
 .jp-RunningSessions-viewButton[aria-pressed='true'] {
   box-shadow: none;
 }
