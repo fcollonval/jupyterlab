@@ -45,11 +45,9 @@ export class TableOfContentsItem extends React.PureComponent<
     const { children, isActive, heading, onCollapse, onMouseDown } = this.props;
 
     return (
-      <TreeItem className="jp-tocItem">
+      <TreeItem className="jp-tocItem" selected={isActive} expanded={!heading.collapsed}>
         <div
-          className={`jp-tocItem-heading ${
-            isActive ? 'jp-tocItem-active' : ''
-          }`}
+          className="jp-tocItem-heading"
           onMouseDown={(event: React.SyntheticEvent<HTMLDivElement>) => {
             // React only on deepest item
             if (!event.defaultPrevented) {
@@ -81,7 +79,7 @@ export class TableOfContentsItem extends React.PureComponent<
             {heading.text}
           </span>
         </div>
-        {children && !heading.collapsed && <ol>{children}</ol>}
+        {children && !heading.collapsed && <>{children}</>}
       </TreeItem>
     );
   }

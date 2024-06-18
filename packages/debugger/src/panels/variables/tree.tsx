@@ -75,6 +75,7 @@ export class VariablesBodyTree extends ReactWidget {
 
     return scope ? (
       <>
+      <TreeView>
         <VariablesBranch
           key={scope.name}
           commands={this._commands}
@@ -94,6 +95,7 @@ export class VariablesBodyTree extends ReactWidget {
           hoverChanged={this._hoverChanged}
           handleSelectVariable={handleSelectVariable}
         />
+      </TreeView>
       </>
     ) : (
       <div></div>
@@ -334,7 +336,7 @@ const VariablesBranch = (props: IVariablesBranchProps): JSX.Element => {
   }, [data]);
 
   return (
-    <TreeView className="jp-DebuggerVariables-branch">
+    <>
       {variables
         .filter(
           variable => !(filter || new Set()).has(variable.evaluateName || '')
@@ -355,7 +357,7 @@ const VariablesBranch = (props: IVariablesBranchProps): JSX.Element => {
             />
           );
         })}
-    </TreeView>
+    </>
   );
 };
 
@@ -455,6 +457,7 @@ const VariableComponent = (props: IVariableComponentProps): JSX.Element => {
 
   return (
       <TreeItem
+        expanded={expanded}
         onClick={(e): Promise<void> => onVariableClicked(e)}
         onMouseDown={e => {
           e.stopPropagation();
@@ -476,17 +479,6 @@ const VariableComponent = (props: IVariableComponentProps): JSX.Element => {
           }
         }}
       >
-        <span
-          className={
-            'jp-DebuggerVariables-collapser' +
-            (expanded ? ' jp-mod-expanded' : '')
-          }
-        >
-          {
-            // note: using React.cloneElement due to high typestyle cost
-            expandable ? React.cloneElement(collapserIcon) : null
-          }
-        </span>
         <span className="jp-DebuggerVariables-name">{variable.name}</span>
         <span className="jp-DebuggerVariables-detail">
           {_prepareDetail(variable)}

@@ -150,6 +150,22 @@ span.jp-RunningSessions-icon > svg {
   visibility: hidden;
 }
 
+.jp-RunningSessions-shutdownAll.jp-ToolbarButtonComponent {
+  color: var(--jp-warn-color1);
+}
+
+.jp-RunningSessions-shutdownAll.jp-ToolbarButtonComponent[disabled] {
+  color: var(--jp-ui-font-color2);
+}
+
+jp-tree-item::part(expand-collapse-button) {
+  color: var(--jp-inverse-layout-color3);
+}
+
+jp-tree-view {
+  --density: -4
+}
+
 /*-----------------------------------------------------------------------------
 | SearchableSessions
 |----------------------------------------------------------------------------*/
