@@ -11,6 +11,8 @@ import {
   searchIcon
 } from '@jupyterlab/ui-components';
 
+import {TreeView, TreeItem} from '@jupyter/react-components'
+
 import { ArrayExt } from '@lumino/algorithm';
 
 import { CommandRegistry } from '@lumino/commands';
@@ -332,7 +334,7 @@ const VariablesBranch = (props: IVariablesBranchProps): JSX.Element => {
   }, [data]);
 
   return (
-    <ul className="jp-DebuggerVariables-branch">
+    <TreeView className="jp-DebuggerVariables-branch">
       {variables
         .filter(
           variable => !(filter || new Set()).has(variable.evaluateName || '')
@@ -353,7 +355,7 @@ const VariablesBranch = (props: IVariablesBranchProps): JSX.Element => {
             />
           );
         })}
-    </ul>
+    </TreeView>
   );
 };
 
@@ -452,57 +454,57 @@ const VariableComponent = (props: IVariableComponentProps): JSX.Element => {
   };
 
   return (
-    <li
-      onClick={(e): Promise<void> => onVariableClicked(e)}
-      onMouseDown={e => {
-        e.stopPropagation();
-        onSelection(variable);
-      }}
-      onMouseOver={(event: React.MouseEvent<HTMLLIElement, MouseEvent>) => {
-        if (onHoverChanged) {
-          onHoverChanged({ target: event.currentTarget, variable });
-          event.stopPropagation();
-        }
-      }}
-      onMouseLeave={(event: React.MouseEvent<HTMLLIElement, MouseEvent>) => {
-        if (onHoverChanged) {
-          onHoverChanged({
-            target: event.relatedTarget as EventTarget & HTMLElement,
-            variable: null
-          });
-          event.stopPropagation();
-        }
-      }}
-    >
-      <span
-        className={
-          'jp-DebuggerVariables-collapser' +
-          (expanded ? ' jp-mod-expanded' : '')
-        }
+      <TreeItem
+        onClick={(e): Promise<void> => onVariableClicked(e)}
+        onMouseDown={e => {
+          e.stopPropagation();
+          onSelection(variable);
+        }}
+        onMouseOver={(event: React.MouseEvent<HTMLLIElement, MouseEvent>) => {
+          if (onHoverChanged) {
+            onHoverChanged({ target: event.currentTarget, variable });
+            event.stopPropagation();
+          }
+        }}
+        onMouseLeave={(event: React.MouseEvent<HTMLLIElement, MouseEvent>) => {
+          if (onHoverChanged) {
+            onHoverChanged({
+              target: event.relatedTarget as EventTarget & HTMLElement,
+              variable: null
+            });
+            event.stopPropagation();
+          }
+        }}
       >
-        {
-          // note: using React.cloneElement due to high typestyle cost
-          expandable ? React.cloneElement(collapserIcon) : null
-        }
-      </span>
-      <span className="jp-DebuggerVariables-name">{variable.name}</span>
-      <span className="jp-DebuggerVariables-detail">
-        {_prepareDetail(variable)}
-      </span>
-      {expanded && variables && (
-        <VariablesBranch
-          key={variable.name}
-          commands={commands}
-          data={variables}
-          service={service}
-          filter={filter}
-          translator={translator}
-          handleSelectVariable={onSelect}
-          onHoverChanged={onHoverChanged}
-          collapserIcon={collapserIcon}
-        />
-      )}
-    </li>
+        <span
+          className={
+            'jp-DebuggerVariables-collapser' +
+            (expanded ? ' jp-mod-expanded' : '')
+          }
+        >
+          {
+            // note: using React.cloneElement due to high typestyle cost
+            expandable ? React.cloneElement(collapserIcon) : null
+          }
+        </span>
+        <span className="jp-DebuggerVariables-name">{variable.name}</span>
+        <span className="jp-DebuggerVariables-detail">
+          {_prepareDetail(variable)}
+        </span>
+        {expanded && variables && (
+          <VariablesBranch
+            key={variable.name}
+            commands={commands}
+            data={variables}
+            service={service}
+            filter={filter}
+            translator={translator}
+            handleSelectVariable={onSelect}
+            onHoverChanged={onHoverChanged}
+            collapserIcon={collapserIcon}
+          />
+        )}
+      </TreeItem>
   );
 };
 

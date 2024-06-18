@@ -4,6 +4,7 @@
 import { caretDownIcon, caretRightIcon } from '@jupyterlab/ui-components';
 import * as React from 'react';
 import { TableOfContents } from './tokens';
+import {TreeItem} from '@jupyter/react-components'
 
 /**
  * Interface describing component properties.
@@ -44,7 +45,7 @@ export class TableOfContentsItem extends React.PureComponent<
     const { children, isActive, heading, onCollapse, onMouseDown } = this.props;
 
     return (
-      <li className="jp-tocItem">
+      <TreeItem className="jp-tocItem">
         <div
           className={`jp-tocItem-heading ${
             isActive ? 'jp-tocItem-active' : ''
@@ -81,7 +82,7 @@ export class TableOfContentsItem extends React.PureComponent<
           </span>
         </div>
         {children && !heading.collapsed && <ol>{children}</ol>}
-      </li>
+      </TreeItem>
     );
   }
 }
