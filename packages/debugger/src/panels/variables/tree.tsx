@@ -483,7 +483,7 @@ const VariableComponent = (props: IVariableComponentProps): JSX.Element => {
         <span className="jp-DebuggerVariables-detail">
           {_prepareDetail(variable)}
         </span>
-        {expanded && variables && (
+        {variables && (
           <VariablesBranch
             key={variable.name}
             commands={commands}

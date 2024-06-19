@@ -162,8 +162,9 @@ jp-tree-item::part(expand-collapse-button) {
   color: var(--jp-inverse-layout-color3);
 }
 
-jp-tree-view {
-  --density: -4
+.jp-tree-view {
+  --density: -4;
+  min-width: auto;
 }
 
 /*-----------------------------------------------------------------------------

@@ -432,7 +432,7 @@ class ListWidget extends ReactWidget {
           }
           return (
             <div className={CONTAINER_CLASS}>
-              <TreeView>
+              <TreeView className='jp-TreeView'>
                 <List
                   runningItems={options.runningItems}
                   shutdownLabel={options.manager.shutdownLabel}
