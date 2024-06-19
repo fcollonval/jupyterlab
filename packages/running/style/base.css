@@ -158,7 +158,7 @@ span.jp-RunningSessions-icon > svg {
   color: var(--jp-ui-font-color2);
 }
 
-jp-tree-item::part(expand-collapse-button) {
+.jp-tree-item::part(expand-collapse-button) {
   color: var(--jp-inverse-layout-color3);
 }
 
