@@ -7,6 +7,9 @@
 | Variables
 |----------------------------------------------------------------------------*/
 
+/* Import toolkit styles */
+@import url('toolkit.css');
+
 :root {
   --jp-private-running-item-height: 24px;
 }
@@ -156,15 +159,6 @@ span.jp-RunningSessions-icon > svg {
 
 .jp-RunningSessions-shutdownAll.jp-ToolbarButtonComponent[disabled] {
   color: var(--jp-ui-font-color2);
-}
-
-.jp-tree-item::part(expand-collapse-button) {
-  color: var(--jp-inverse-layout-color3);
-}
-
-.jp-tree-view {
-  --density: -4;
-  min-width: auto;
 }
 
 /*-----------------------------------------------------------------------------

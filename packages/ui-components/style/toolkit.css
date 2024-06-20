@@ -1,0 +1,15 @@
+/*-----------------------------------------------------------------------------
+| Copyright (c) Jupyter Development Team.
+| Distributed under the terms of the Modified BSD License.
+|----------------------------------------------------------------------------*/
+
+/* Styles for tree item */
+.jp-tree-item::part(expand-collapse-button) {
+  color: var(--jp-inverse-layout-color3);
+}
+
+/* Styles for tree view */
+.jp-tree-view {
+  --density: -4;
+  min-width: auto;
+}
