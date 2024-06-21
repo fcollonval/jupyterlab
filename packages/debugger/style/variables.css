@@ -2,6 +2,10 @@
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
+
+/* Import toolkit styles */
+@import url('../../ui-components/style/toolkit.css');
+
 .jp-DebuggerVariables {
   display: flex;
   flex-direction: column;

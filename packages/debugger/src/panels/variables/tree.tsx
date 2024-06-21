@@ -75,7 +75,7 @@ export class VariablesBodyTree extends ReactWidget {
 
     return scope ? (
       <>
-      <TreeView>
+      <TreeView className='jp-TreeView'>
         <VariablesBranch
           key={scope.name}
           commands={this._commands}
@@ -457,6 +457,7 @@ const VariableComponent = (props: IVariableComponentProps): JSX.Element => {
 
   return (
       <TreeItem
+        className='jp-TreeItem'
         expanded={expanded}
         onClick={(e): Promise<void> => onVariableClicked(e)}
         onMouseDown={e => {

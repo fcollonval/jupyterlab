@@ -4,12 +4,12 @@
 |----------------------------------------------------------------------------*/
 
 /* Styles for tree item */
-.jp-tree-item::part(expand-collapse-button) {
+.jp-TreeItem::part(expand-collapse-button) {
   color: var(--jp-inverse-layout-color3);
 }
 
 /* Styles for tree view */
-.jp-tree-view {
+.jp-TreeView {
   --density: -4;
   min-width: auto;
 }

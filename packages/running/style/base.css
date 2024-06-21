@@ -8,7 +8,7 @@
 |----------------------------------------------------------------------------*/
 
 /* Import toolkit styles */
-@import url('toolkit.css');
+@import url('../../ui-components/style/toolkit.css');
 
 :root {
   --jp-private-running-item-height: 24px;
