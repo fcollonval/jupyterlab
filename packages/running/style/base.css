@@ -7,9 +7,6 @@
 | Variables
 |----------------------------------------------------------------------------*/
 
-/* Import toolkit styles */
-@import url('../../ui-components/style/toolkit.css');
-
 :root {
   --jp-private-running-item-height: 24px;
 }
@@ -60,9 +57,13 @@
   margin-left: 0;
 }
 
-.jp-mod-running-list-view .jp-RunningSessions-item.jp-mod-kernel,
-.jp-mod-running-list-view .jp-RunningSessions-item.jp-mod-kernelspec {
+.jp-mod-running-list-view .jp-RunningSessions-item.jp-mod-kernelspec::part(positioning-region),
+.jp-mod-running-list-view .jp-RunningSessions-item.jp-mod-kernel::part(positioning-region) {
   display: none;
+}
+
+.jp-mod-running-list-view .jp-RunningSessions-item.jp-mod-kernel-widget::part(content-region) {
+  margin-inline-start: calc(-1* var(--expand-collapse-button-size) + var(--design-unit)* 2px + 8px);
 }
 
 .jp-RunningSessions-item.jp-mod-kernelspec,
