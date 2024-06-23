@@ -206,11 +206,11 @@ function Item(props: {
     (typeof props.shutdownLabel === 'function'
       ? props.shutdownLabel(runningItem)
       : props.shutdownLabel) ?? trans.__('Shut Down');
-      const shutdown = (event: React.MouseEvent) => {      
+      const shutdown = (event: React.MouseEvent) => {
         if (!event.defaultPrevented) {
           event.preventDefault();
           runningItem.shutdown?.();
-        }          
+        }
   };
 
   // Materialise getter to avoid triggering it repeatedly
