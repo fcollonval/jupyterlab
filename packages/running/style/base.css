@@ -145,11 +145,6 @@ span.jp-RunningSessions-icon > svg {
   width: 16px;
 }
 
-.jp-RunningSessions-item .jp-RunningSessions-itemShutdown {
-  border-radius: 0;
-  margin: 0;
-}
-
 .jp-RunningSessions-item:not(:hover) .jp-RunningSessions-itemShutdown {
   visibility: hidden;
 }

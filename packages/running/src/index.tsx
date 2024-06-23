@@ -25,11 +25,10 @@ import {
   tableRowsIcon,
   Toolbar,
   ToolbarButton,
-  ToolbarButtonComponent,
   treeViewIcon,
   UseSignal
 } from '@jupyterlab/ui-components';
-import {TreeView, TreeItem} from '@jupyter/react-components'
+import { Button, TreeItem, TreeView } from '@jupyter/react-components';
 import { IStateDB } from '@jupyterlab/statedb';
 import { Token } from '@lumino/coreutils';
 import { DisposableDelegate, IDisposable } from '@lumino/disposable';
@@ -202,15 +201,16 @@ function Item(props: {
   const trans = translator.load('jupyterlab');
 
   // Handle shutdown requests.
-  let stopPropagation = false;
   const shutdownItemIcon = props.shutdownItemIcon || closeIcon;
   const shutdownLabel =
     (typeof props.shutdownLabel === 'function'
       ? props.shutdownLabel(runningItem)
       : props.shutdownLabel) ?? trans.__('Shut Down');
-  const shutdown = () => {
-    stopPropagation = true;
-    runningItem.shutdown?.();
+      const shutdown = (event: React.MouseEvent) => {      
+        if (!event.defaultPrevented) {
+          event.preventDefault();
+          runningItem.shutdown?.();
+        }          
   };
 
   // Materialise getter to avoid triggering it repeatedly
@@ -219,9 +219,14 @@ function Item(props: {
   // Manage collapsed state. Use the shutdown flag in lieu of `stopPropagation`.
   const [collapsed, collapse] = React.useState(false);
   const collapsible = !!children?.length;
-  const onClick = collapsible
-    ? () => !stopPropagation && collapse(!collapsed)
-    : undefined;
+  const onClick = (event: React.MouseEvent) => {
+    if (!event.defaultPrevented) {
+      event.preventDefault();
+      if (collapsible) {
+        collapse(!collapsed);
+      }
+    }
+  };
 
   // Listen to signal to collapse from outside
   props.collapseToggled.connect((_emitter, newCollapseState) =>
@@ -240,29 +245,32 @@ function Item(props: {
         data-context={runningItem.context || ''}
         expanded={!collapsed}
       >
-          {icon ? (
-            typeof icon === 'string' ? (
-              <img src={icon} className={ITEM_ICON_CLASS} />
-            ) : (
-              <icon.react tag="span" className={ITEM_ICON_CLASS} />
-            )
-          ) : undefined}
-          <span
-            className={ITEM_LABEL_CLASS}
-            title={title}
-            onClick={runningItem.open && (() => runningItem.open!())}
+        {icon ? (
+          typeof icon === 'string' ? (
+            <img src={icon} className={ITEM_ICON_CLASS} />
+          ) : (
+            <icon.react tag="span" className={ITEM_ICON_CLASS} />
+          )
+        ) : undefined}
+        <span
+          className={ITEM_LABEL_CLASS}
+          title={title}
+          onClick={runningItem.open && (() => runningItem.open!())}
           >
-            {runningItem.label()}
+          {runningItem.label()}
           </span>
           {detail && <span className={ITEM_DETAIL_CLASS}>{detail}</span>}
           {runningItem.shutdown && (
-            <ToolbarButtonComponent
-              className={SHUTDOWN_BUTTON_CLASS}
-              icon={shutdownItemIcon}
-              onClick={shutdown}
-              tooltip={shutdownLabel}
-            />
-          )}
+          <Button
+            appearance="stealth"
+            className={SHUTDOWN_BUTTON_CLASS}
+            onClick={shutdown}
+            title={shutdownLabel}
+            minimal
+          >
+            <shutdownItemIcon.react tag={null} />
+            </Button>
+        )}
         {children && (
           <List
             runningItems={children!}
