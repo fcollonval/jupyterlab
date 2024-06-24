@@ -1,7 +1,6 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { caretDownIcon, caretRightIcon } from '@jupyterlab/ui-components';
 import * as React from 'react';
 import { TableOfContents } from './tokens';
 import {TreeItem} from '@jupyter/react-components'
@@ -25,9 +24,9 @@ export interface ITableOfContentsItemsProps {
   onMouseDown: (heading: TableOfContents.IHeading) => void;
 
   /**
-   * Collapse event callback.
-   */
-  onCollapse: (heading: TableOfContents.IHeading) => void;
+  * Collapse/Expand event callback.
+  */
+  onToggleCollapse: (heading: TableOfContents.IHeading) => void;
 }
 
 /**
@@ -42,10 +41,16 @@ export class TableOfContentsItem extends React.PureComponent<
    * @returns rendered entry
    */
   render(): JSX.Element | null {
-    const { children, isActive, heading, onCollapse, onMouseDown } = this.props;
+    const { children, isActive, heading, onToggleCollapse, onMouseDown } = this.props;
+
+    // Handling toggle of collapse and expand
+    const handleToggle = () => {
+        // This will toggle the state and call the appropriate collapse or expand function
+        onToggleCollapse(heading);
+    };
 
     return (
-      <TreeItem className="jp-tocItem" selected={isActive} expanded={!heading.collapsed}>
+      <TreeItem className="jp-tocItem" selected={isActive} expanded={!heading.collapsed} onClick={handleToggle}>
         <div
           className="jp-tocItem-heading"
           onMouseDown={(event: React.SyntheticEvent<HTMLDivElement>) => {
@@ -56,20 +61,6 @@ export class TableOfContentsItem extends React.PureComponent<
             }
           }}
         >
-          <button
-            className="jp-tocItem-collapser"
-            onClick={(event: React.MouseEvent) => {
-              event.preventDefault();
-              onCollapse(heading);
-            }}
-            style={{ visibility: children ? 'visible' : 'hidden' }}
-          >
-            {heading.collapsed ? (
-              <caretRightIcon.react tag="span" width="20px" />
-            ) : (
-              <caretDownIcon.react tag="span" width="20px" />
-            )}
-          </button>
           <span
             className="jp-tocItem-content"
             title={heading.text}
@@ -79,7 +70,7 @@ export class TableOfContentsItem extends React.PureComponent<
             {heading.text}
           </span>
         </div>
-        {children && !heading.collapsed && <>{children}</>}
+        {children}
       </TreeItem>
     );
   }

@@ -82,7 +82,7 @@ export class TableOfContentsTree extends React.PureComponent<ITableOfContentsTre
           }
           heading={current}
           onMouseDown={this.props.setActiveHeading}
-          onCollapse={this.props.onCollapseChange}
+          onToggleCollapse={this.props.onCollapseChange}
         >
           {children.length ? children : null}
         </TableOfContentsItem>
