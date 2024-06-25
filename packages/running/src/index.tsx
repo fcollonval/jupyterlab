@@ -206,11 +206,11 @@ function Item(props: {
     (typeof props.shutdownLabel === 'function'
       ? props.shutdownLabel(runningItem)
       : props.shutdownLabel) ?? trans.__('Shut Down');
-      const shutdown = (event: React.MouseEvent) => {
-        if (!event.defaultPrevented) {
-          event.preventDefault();
-          runningItem.shutdown?.();
-        }
+  const shutdown = (event: React.MouseEvent) => {
+    if (!event.defaultPrevented) {
+      event.preventDefault();
+      runningItem.shutdown?.();
+    }
   };
 
   // Materialise getter to avoid triggering it repeatedly
@@ -256,11 +256,11 @@ function Item(props: {
           className={ITEM_LABEL_CLASS}
           title={title}
           onClick={runningItem.open && (() => runningItem.open!())}
-          >
+        >
           {runningItem.label()}
-          </span>
-          {detail && <span className={ITEM_DETAIL_CLASS}>{detail}</span>}
-          {runningItem.shutdown && (
+        </span>
+        {detail && <span className={ITEM_DETAIL_CLASS}>{detail}</span>}
+        {runningItem.shutdown && (
           <Button
             appearance="stealth"
             className={SHUTDOWN_BUTTON_CLASS}
@@ -269,7 +269,7 @@ function Item(props: {
             minimal
           >
             <shutdownItemIcon.react tag={null} />
-            </Button>
+          </Button>
         )}
         {children && (
           <List
@@ -440,7 +440,7 @@ class ListWidget extends ReactWidget {
           }
           return (
             <div className={CONTAINER_CLASS}>
-              <TreeView className='jp-TreeView'>
+              <TreeView className="jp-TreeView-Button">
                 <List
                   runningItems={options.runningItems}
                   shutdownLabel={options.manager.shutdownLabel}

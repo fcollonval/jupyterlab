@@ -7,6 +7,9 @@
 | Table of Contents
 |----------------------------------------------------------------------------*/
 
+/* Import toolkit styles */
+@import url('../../ui-components/style/toolkit.css');
+
 :root {
   --jp-private-toc-active-width: 4px;
 }
@@ -68,10 +71,6 @@
 .jp-tocItem-heading {
   display: flex;
   cursor: pointer;
-}
-
-.jp-tocItem-heading:hover {
-  background-color: var(--jp-layout-color2);
 }
 
 .jp-tocItem-content {

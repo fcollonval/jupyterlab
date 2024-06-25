@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { TableOfContentsItem } from './tocitem';
 import { TableOfContents } from './tokens';
-import {TreeView} from '@jupyter/react-components'
+import { TreeView } from '@jupyter/react-components';
 
 /**
  * Interface describing component properties.
@@ -43,7 +43,7 @@ export class TableOfContentsTree extends React.PureComponent<ITableOfContentsTre
     const { documentType } = this.props;
     return (
       <TreeView
-        className="jp-TableOfContents-content"
+        className={'jp-TableOfContents-content jp-TreeView-Button'}
         {...{ 'data-document-type': documentType }}
       >
         {this.buildTree()}

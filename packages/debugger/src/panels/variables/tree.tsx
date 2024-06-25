@@ -11,7 +11,7 @@ import {
   searchIcon
 } from '@jupyterlab/ui-components';
 
-import {TreeView, TreeItem} from '@jupyter/react-components'
+import { TreeItem, TreeView } from '@jupyter/react-components';
 
 import { ArrayExt } from '@lumino/algorithm';
 
@@ -75,27 +75,27 @@ export class VariablesBodyTree extends ReactWidget {
 
     return scope ? (
       <>
-      <TreeView className='jp-TreeView'>
-        <VariablesBranch
-          key={scope.name}
-          commands={this._commands}
-          service={this._service}
-          data={scope.variables}
-          filter={this._filter}
-          translator={this._translator}
-          handleSelectVariable={handleSelectVariable}
-          onHoverChanged={(data: IHoverData) => {
-            this._hoverChanged.emit(data);
-          }}
-          collapserIcon={collapserIcon}
-        />
-        <TreeButtons
-          commands={this._commands}
-          service={this._service}
-          hoverChanged={this._hoverChanged}
-          handleSelectVariable={handleSelectVariable}
-        />
-      </TreeView>
+        <TreeView className="jp-TreeView-Button">
+          <VariablesBranch
+            key={scope.name}
+            commands={this._commands}
+            service={this._service}
+            data={scope.variables}
+            filter={this._filter}
+            translator={this._translator}
+            handleSelectVariable={handleSelectVariable}
+            onHoverChanged={(data: IHoverData) => {
+              this._hoverChanged.emit(data);
+            }}
+            collapserIcon={collapserIcon}
+          />
+          <TreeButtons
+            commands={this._commands}
+            service={this._service}
+            hoverChanged={this._hoverChanged}
+            handleSelectVariable={handleSelectVariable}
+          />
+        </TreeView>
       </>
     ) : (
       <div></div>
@@ -456,49 +456,50 @@ const VariableComponent = (props: IVariableComponentProps): JSX.Element => {
   };
 
   return (
-      <TreeItem
-        className='jp-TreeItem'
-        expanded={expanded}
-        onClick={(e): Promise<void> => onVariableClicked(e)}
-        onMouseDown={e => {
-          e.stopPropagation();
-          onSelection(variable);
-        }}
-        onMouseOver={(event: React.MouseEvent<HTMLLIElement, MouseEvent>) => {
-          if (onHoverChanged) {
-            onHoverChanged({ target: event.currentTarget, variable });
-            event.stopPropagation();
-          }
-        }}
-        onMouseLeave={(event: React.MouseEvent<HTMLLIElement, MouseEvent>) => {
-          if (onHoverChanged) {
-            onHoverChanged({
-              target: event.relatedTarget as EventTarget & HTMLElement,
-              variable: null
-            });
-            event.stopPropagation();
-          }
-        }}
-      >
-        <span className="jp-DebuggerVariables-name">{variable.name}</span>
-        <span className="jp-DebuggerVariables-detail">
-          {_prepareDetail(variable)}
-        </span>
-        {variables ? (
-          <VariablesBranch
-            key={variable.name}
-            commands={commands}
-            data={variables}
-            service={service}
-            filter={filter}
-            translator={translator}
-            handleSelectVariable={onSelect}
-            onHoverChanged={onHoverChanged}
-            collapserIcon={collapserIcon}
-          />
-        ) : expandable && (<TreeItem/>)
-      }
-      </TreeItem>
+    <TreeItem
+      className="jp-TreeItem"
+      expanded={expanded}
+      onClick={(e): Promise<void> => onVariableClicked(e)}
+      onMouseDown={e => {
+        e.stopPropagation();
+        onSelection(variable);
+      }}
+      onMouseOver={(event: React.MouseEvent<HTMLLIElement, MouseEvent>) => {
+        if (onHoverChanged) {
+          onHoverChanged({ target: event.currentTarget, variable });
+          event.stopPropagation();
+        }
+      }}
+      onMouseLeave={(event: React.MouseEvent<HTMLLIElement, MouseEvent>) => {
+        if (onHoverChanged) {
+          onHoverChanged({
+            target: event.relatedTarget as EventTarget & HTMLElement,
+            variable: null
+          });
+          event.stopPropagation();
+        }
+      }}
+    >
+      <span className="jp-DebuggerVariables-name">{variable.name}</span>
+      <span className="jp-DebuggerVariables-detail">
+        {_prepareDetail(variable)}
+      </span>
+      {variables ? (
+        <VariablesBranch
+          key={variable.name}
+          commands={commands}
+          data={variables}
+          service={service}
+          filter={filter}
+          translator={translator}
+          handleSelectVariable={onSelect}
+          onHoverChanged={onHoverChanged}
+          collapserIcon={collapserIcon}
+        />
+      ) : (
+        expandable && <TreeItem />
+      )}
+    </TreeItem>
   );
 };
 

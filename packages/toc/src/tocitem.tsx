@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { TableOfContents } from './tokens';
-import {TreeItem} from '@jupyter/react-components'
+import { TreeItem } from '@jupyter/react-components';
 
 /**
  * Interface describing component properties.
@@ -24,8 +24,8 @@ export interface ITableOfContentsItemsProps {
   onMouseDown: (heading: TableOfContents.IHeading) => void;
 
   /**
-  * Collapse/Expand event callback.
-  */
+   * Collapse/Expand event callback.
+   */
   onToggleCollapse: (heading: TableOfContents.IHeading) => void;
 }
 
@@ -41,16 +41,22 @@ export class TableOfContentsItem extends React.PureComponent<
    * @returns rendered entry
    */
   render(): JSX.Element | null {
-    const { children, isActive, heading, onToggleCollapse, onMouseDown } = this.props;
+    const { children, isActive, heading, onToggleCollapse, onMouseDown } =
+      this.props;
 
     // Handling toggle of collapse and expand
     const handleToggle = () => {
-        // This will toggle the state and call the appropriate collapse or expand function
-        onToggleCollapse(heading);
+      // This will toggle the state and call the appropriate collapse or expand function
+      onToggleCollapse(heading);
     };
 
     return (
-      <TreeItem className="jp-tocItem" selected={isActive} expanded={!heading.collapsed} onClick={handleToggle}>
+      <TreeItem
+        className={'jp-tocItem jp-TreeItem'}
+        selected={isActive}
+        expanded={!heading.collapsed}
+        onClick={handleToggle}
+      >
         <div
           className="jp-tocItem-heading"
           onMouseDown={(event: React.SyntheticEvent<HTMLDivElement>) => {
