@@ -61,6 +61,7 @@ export class TableOfContentsItem extends React.PureComponent<
           className="jp-tocItem-heading"
           onMouseDown={(event: React.SyntheticEvent<HTMLDivElement>) => {
             // React only on deepest item
+            event.stopPropagation();
             if (!event.defaultPrevented) {
               event.preventDefault();
               onMouseDown(heading);
