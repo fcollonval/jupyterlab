@@ -2,10 +2,6 @@
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
-
-/* Import toolkit styles */
-@import url('../../ui-components/style/toolkit.css');
-
 .jp-DebuggerVariables {
   display: flex;
   flex-direction: column;
@@ -22,48 +18,6 @@
 
   /* For absolute positioning of jp-DebuggerVariables-buttons. */
   position: relative;
-}
-
-.jp-DebuggerVariables-branch {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.jp-DebuggerVariables-body
-  .jp-DebuggerVariables-branch
-  .jp-DebuggerVariables-branch {
-  grid-area: nested;
-}
-
-.jp-DebuggerVariables-body > .jp-DebuggerVariables-branch {
-  padding-top: 0.1em;
-}
-
-.jp-DebuggerVariables-branch li {
-  padding: 3px 0;
-  cursor: pointer;
-  color: var(--jp-content-font-color1);
-  display: grid;
-  grid-template:
-    'collapser name detail'
-    'nested nested nested';
-  grid-template-columns: max-content max-content 1fr;
-}
-
-.jp-DebuggerVariables-branch li:not(:has(li:hover)):hover {
-  background: var(--jp-layout-color2);
-}
-
-.jp-DebuggerVariables-collapser {
-  width: 16px;
-  grid-area: collapser;
-  transform: rotate(-90deg);
-  transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.jp-DebuggerVariables-collapser.jp-mod-expanded {
-  transform: rotate(0);
 }
 
 .jp-DebuggerVariables-buttons {
@@ -106,10 +60,6 @@
 
 .jp-DebuggerVariables-renderVariable:disabled {
   cursor: default;
-}
-
-.jp-DebuggerVariables-branch li > .jp-DebuggerVariables-branch {
-  margin-left: 12px;
 }
 
 .jp-DebuggerVariables-grid {

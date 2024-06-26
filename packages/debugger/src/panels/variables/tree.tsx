@@ -75,7 +75,7 @@ export class VariablesBodyTree extends ReactWidget {
 
     return scope ? (
       <>
-        <TreeView className="jp-TreeView-Button">
+        <TreeView className="jp-TreeView">
           <VariablesBranch
             key={scope.name}
             commands={this._commands}
@@ -443,11 +443,16 @@ const VariableComponent = (props: IVariableComponentProps): JSX.Element => {
   const expandable =
     variable.variablesReference !== 0 || variable.type === 'function';
 
-  const onVariableClicked = async (e: React.MouseEvent): Promise<void> => {
+  const onVariableClicked = async (event: React.MouseEvent): Promise<void> => {
+    if (event.defaultPrevented) {
+      return;
+    }
+
+    event.preventDefault();
     if (!expandable) {
       return;
     }
-    e.stopPropagation();
+
     const variables = await service.inspectVariable(
       variable.variablesReference
     );
@@ -459,6 +464,7 @@ const VariableComponent = (props: IVariableComponentProps): JSX.Element => {
     <TreeItem
       className="jp-TreeItem"
       expanded={expanded}
+      selected={false /* Prevent selected styling */}
       onClick={(e): Promise<void> => onVariableClicked(e)}
       onMouseDown={e => {
         e.stopPropagation();
@@ -497,6 +503,8 @@ const VariableComponent = (props: IVariableComponentProps): JSX.Element => {
           collapserIcon={collapserIcon}
         />
       ) : (
+        /* Trick to ensure collapse button is displayed
+           when variables are not loaded yet */
         expandable && <TreeItem />
       )}
     </TreeItem>

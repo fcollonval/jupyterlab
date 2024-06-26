@@ -9,7 +9,7 @@
 }
 
 /* Styles for tree view */
-.jp-TreeView-Button {
+.jp-TreeView {
   --density: -4;
 
   min-width: auto;

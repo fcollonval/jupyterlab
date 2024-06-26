@@ -3,14 +3,6 @@
  * Distributed under the terms of the Modified BSD License.
  */
 
-/*-----------------------------------------------------------------------------
-| Variables
-|----------------------------------------------------------------------------*/
-
-:root {
-  --jp-private-running-item-height: 24px;
-}
-
 .jp-RunningSessions {
   display: flex;
   flex-direction: column;
@@ -57,13 +49,18 @@
   margin-left: 0;
 }
 
-.jp-mod-running-list-view .jp-RunningSessions-item.jp-mod-kernelspec::part(positioning-region),
-.jp-mod-running-list-view .jp-RunningSessions-item.jp-mod-kernel::part(positioning-region) {
+.jp-mod-running-list-view
+  .jp-RunningSessions-item.jp-mod-kernelspec::part(positioning-region),
+.jp-mod-running-list-view
+  .jp-RunningSessions-item.jp-mod-kernel::part(positioning-region) {
   display: none;
 }
 
-.jp-mod-running-list-view .jp-RunningSessions-item.jp-mod-kernel-widget::part(content-region) {
-  margin-inline-start: calc(-1* var(--expand-collapse-button-size) + var(--design-unit)* 2px + 8px);
+.jp-mod-running-list-view
+  .jp-RunningSessions-item.jp-mod-kernel-widget::part(content-region) {
+  margin-inline-start: calc(
+    -1 * var(--expand-collapse-button-size) + var(--design-unit) * 2px + 8px
+  );
 }
 
 .jp-RunningSessions-item.jp-mod-kernelspec,
@@ -151,6 +148,9 @@ span.jp-RunningSessions-icon > svg {
 
 .jp-RunningSessions-shutdownAll.jp-ToolbarButtonComponent {
   color: var(--jp-warn-color1);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .jp-RunningSessions-shutdownAll.jp-ToolbarButtonComponent[disabled] {

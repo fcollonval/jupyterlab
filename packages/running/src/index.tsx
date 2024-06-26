@@ -5,7 +5,9 @@
  * @module running
  */
 
+import { Button, TreeItem, TreeView } from '@jupyter/react-components';
 import { Dialog, showDialog } from '@jupyterlab/apputils';
+import { IStateDB } from '@jupyterlab/statedb';
 import {
   ITranslator,
   nullTranslator,
@@ -28,8 +30,6 @@ import {
   treeViewIcon,
   UseSignal
 } from '@jupyterlab/ui-components';
-import { Button, TreeItem, TreeView } from '@jupyter/react-components';
-import { IStateDB } from '@jupyterlab/statedb';
 import { Token } from '@lumino/coreutils';
 import { DisposableDelegate, IDisposable } from '@lumino/disposable';
 import { ElementExt } from '@lumino/domutils';
@@ -247,9 +247,9 @@ function Item(props: {
       >
         {icon ? (
           typeof icon === 'string' ? (
-            <img src={icon} className={ITEM_ICON_CLASS} />
+            <img src={icon} className={ITEM_ICON_CLASS} slot="start" />
           ) : (
-            <icon.react tag="span" className={ITEM_ICON_CLASS} />
+            <icon.react slot="start" tag="span" className={ITEM_ICON_CLASS} />
           )
         ) : undefined}
         <span
@@ -266,7 +266,7 @@ function Item(props: {
             className={SHUTDOWN_BUTTON_CLASS}
             onClick={shutdown}
             title={shutdownLabel}
-            minimal
+            slot="end"
           >
             <shutdownItemIcon.react tag={null} />
           </Button>
@@ -292,7 +292,6 @@ function List(props: {
   filter?: (item: IRunningSessions.IRunningItem) => Partial<IScore> | null;
   translator?: ITranslator;
   collapseToggled: ISignal<Section, boolean>;
-  expanded?: boolean;
 }) {
   const filter = props.filter;
   const items = filter
@@ -440,7 +439,7 @@ class ListWidget extends ReactWidget {
           }
           return (
             <div className={CONTAINER_CLASS}>
-              <TreeView className="jp-TreeView-Button">
+              <TreeView className="jp-TreeView">
                 <List
                   runningItems={options.runningItems}
                   shutdownLabel={options.manager.shutdownLabel}
