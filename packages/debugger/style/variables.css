@@ -20,16 +20,13 @@
   position: relative;
 }
 
-.jp-DebuggerVariables-buttons {
-  position: absolute;
-  top: 0;
-  right: 8px;
-  margin-top: 3px;
-}
-
 .jp-DebuggerVariables-name {
   color: var(--jp-mirror-editor-attribute-color);
   grid-area: name;
+}
+
+.jp-DebuggerVariables-name:last-of-type {
+  flex: 1 1 auto;
 }
 
 .jp-DebuggerVariables-name::after {
@@ -40,26 +37,10 @@
 .jp-DebuggerVariables-detail {
   /* detail contains value for primitive types or name of the type otherwise */
   color: var(--jp-mirror-editor-string-color);
-}
-
-.jp-DebuggerVariables-renderVariable {
-  border: none;
-  background: none;
-  cursor: pointer;
-  transform-origin: center center;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 1, 1);
-}
-
-.jp-DebuggerVariables-renderVariable:active {
-  transform: scale(1.35);
-}
-
-.jp-DebuggerVariables-renderVariable:hover {
-  background-color: var(--jp-layout-color2);
-}
-
-.jp-DebuggerVariables-renderVariable:disabled {
-  cursor: default;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .jp-DebuggerVariables-grid {
