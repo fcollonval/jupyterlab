@@ -61,17 +61,15 @@ export class TableOfContentsItem extends React.PureComponent<
         selected={isActive}
         expanded={!heading.collapsed}
         onExpand={handleToggle}
+        onMouseDown={(event: React.SyntheticEvent<HTMLElement>) => {
+          // React only on deepest item
+          if (!event.defaultPrevented) {
+            event.preventDefault();
+            onMouseDown(heading);
+          }
+        }}
       >
-        <div
-          className="jp-tocItem-heading"
-          onMouseDown={(event: React.SyntheticEvent<HTMLDivElement>) => {
-            // React only on deepest item
-            if (!event.defaultPrevented) {
-              event.preventDefault();
-              onMouseDown(heading);
-            }
-          }}
-        >
+        <div className="jp-tocItem-heading">
           <span
             className="jp-tocItem-content"
             title={heading.text}

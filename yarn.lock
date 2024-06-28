@@ -4497,6 +4497,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@jupyterlab/running@workspace:packages/running"
   dependencies:
+    "@jupyter/react-components": ^0.16.2
     "@jupyterlab/apputils": ^4.4.0-alpha.0
     "@jupyterlab/statedb": ^4.3.0-alpha.0
     "@jupyterlab/translation": ^4.3.0-alpha.0
@@ -4848,6 +4849,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@jupyterlab/toc@workspace:packages/toc"
   dependencies:
+    "@jupyter/react-components": ^0.16.2
     "@jupyterlab/apputils": ^4.4.0-alpha.0
     "@jupyterlab/coreutils": ^6.3.0-alpha.0
     "@jupyterlab/docregistry": ^4.3.0-alpha.0
