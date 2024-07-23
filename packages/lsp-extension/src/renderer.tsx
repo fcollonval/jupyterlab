@@ -1,6 +1,7 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
+import { Button } from '@jupyter/react-components';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITranslator, TranslationBundle } from '@jupyterlab/translation';
 import { closeIcon } from '@jupyterlab/ui-components';
@@ -300,15 +301,15 @@ function BuildSettingForm(props: ISettingFormProps): JSX.Element {
         </div>
       </div>
       <div className="jp-ArrayOperations">
-        <button className="jp-mod-styled jp-mod-reject" onClick={addProperty}>
+        <Button appearance="neutral" onClick={addProperty}>
           {props.trans.__('Add property')}
-        </button>
-        <button
-          className="jp-mod-styled jp-mod-warn jp-FormGroup-removeButton"
+        </Button>
+        <Button
+          appearance="error"
           onClick={() => props.removeSetting(props.serverHash)}
         >
           {props.trans.__('Remove server')}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -401,9 +402,9 @@ function PropertyFrom(props: {
               : e => changeValue(e.target.checked, state.type)
           }
         />
-        <button className="jp-mod-minimal jp-Button" onClick={removeItem}>
-          <closeIcon.react />
-        </button>
+        <Button appearance="stealth" onClick={removeItem}>
+          <closeIcon.react tag={null} />
+        </Button>
       </div>
     </div>
   );
@@ -573,13 +574,13 @@ class SettingRenderer extends React.Component<IProps, IState> {
             })}
           </div>
           <div>
-            <button
+            <Button
+              appearance="neutral"
               style={{ margin: 2 }}
-              className="jp-mod-styled jp-mod-reject"
               onClick={this.addServerSetting}
             >
               {this._trans.__('Add server')}
-            </button>
+            </Button>
           </div>
         </fieldset>
       </div>

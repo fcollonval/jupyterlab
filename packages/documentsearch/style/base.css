@@ -98,15 +98,13 @@
   height: var(--jp-private-document-search-button-height);
 }
 
-.jp-DocumentSearch-toggle-wrapper:focus,
-.jp-DocumentSearch-button-wrapper:focus {
+.jp-DocumentSearch-toggle-wrapper:focus {
   outline: var(--jp-border-width) solid
     var(--jp-cell-editor-active-border-color);
   outline-offset: -1px;
 }
 
 .jp-DocumentSearch-toggle-wrapper,
-.jp-DocumentSearch-button-wrapper,
 .jp-DocumentSearch-button-content:focus {
   outline: none;
 }

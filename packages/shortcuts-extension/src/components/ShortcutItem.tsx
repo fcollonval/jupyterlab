@@ -3,6 +3,7 @@
  * Distributed under the terms of the Modified BSD License.
  */
 
+import { Button } from '@jupyter/react-components';
 import { TranslationBundle } from '@jupyterlab/translation';
 import { Platform } from '@lumino/domutils';
 import * as React from 'react';
@@ -338,15 +339,16 @@ export class ShortcutItem extends React.Component<
                   )}
                 </div>
                 <div className="jp-Shortcuts-ErrorButton">
-                  <button>{this._trans.__('Cancel')}</button>
-                  <button
+                  <Button>{this._trans.__('Cancel')}</Button>
+                  <Button
+                    appearance="accent"
                     id="no-blur"
                     onClick={() => {
                       conflict.overwrite();
                     }}
                   >
                     {this._trans.__('Overwrite')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             );

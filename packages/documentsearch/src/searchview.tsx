@@ -1,6 +1,7 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
+import { Button } from '@jupyter/react-components';
 import {
   ITranslator,
   nullTranslator,
@@ -179,32 +180,32 @@ function SearchEntry(props: ISearchEntryProps): JSX.Element {
         autoFocus={true}
         autoUpdate={true}
       />
-      <button
+      <Button
+        appearance="stealth"
         className={BUTTON_WRAPPER_CLASS}
         onClick={() => {
           props.onCaseSensitiveToggled();
         }}
-        tabIndex={0}
         title={trans.__('Match Case')}
       >
-        <caseSensitiveIcon.react className={caseButtonToggleClass} tag="span" />
-      </button>
-      <button
+        <caseSensitiveIcon.react className={caseButtonToggleClass} tag={null} />
+      </Button>
+      <Button
+        appearance="stealth"
         className={BUTTON_WRAPPER_CLASS}
         onClick={() => props.onWordToggled()}
-        tabIndex={0}
         title={trans.__('Match Whole Word')}
       >
-        <wordIcon.react className={wordButtonToggleClass} tag="span" />
-      </button>
-      <button
+        <wordIcon.react className={wordButtonToggleClass} tag={null} />
+      </Button>
+      <Button
+        appearance="stealth"
         className={BUTTON_WRAPPER_CLASS}
         onClick={() => props.onRegexToggled()}
-        tabIndex={0}
         title={trans.__('Use Regular Expression')}
       >
-        <regexIcon.react className={regexButtonToggleClass} tag="span" />
-      </button>
+        <regexIcon.react className={regexButtonToggleClass} tag={null} />
+      </Button>
     </div>
   );
 }
@@ -242,43 +243,37 @@ function ReplaceEntry(props: IReplaceEntryProps): JSX.Element {
           autoUpdate={false}
         />
         {props.replaceOptionsSupport?.preserveCase ? (
-          <button
+          <Button
+            appearance="stealth"
             className={BUTTON_WRAPPER_CLASS}
             onClick={() => props.onPreserveCaseToggled()}
-            tabIndex={0}
             title={trans.__('Preserve Case')}
           >
             <caseSensitiveIcon.react
               className={preserveCaseButtonToggleClass}
-              tag="span"
+              tag={null}
             />
-          </button>
+          </Button>
         ) : null}
       </div>
-      <button
+      <Button
+        appearance="stealth"
         className={REPLACE_BUTTON_WRAPPER_CLASS}
         onClick={() => props.onReplaceCurrent()}
-        tabIndex={0}
       >
-        <span
-          className={`${REPLACE_BUTTON_CLASS} ${BUTTON_CONTENT_CLASS}`}
-          tabIndex={0}
-        >
+        <span className={`${REPLACE_BUTTON_CLASS} ${BUTTON_CONTENT_CLASS}`}>
           {trans.__('Replace')}
         </span>
-      </button>
-      <button
+      </Button>
+      <Button
+        appearance="stealth"
         className={REPLACE_BUTTON_WRAPPER_CLASS}
-        tabIndex={0}
         onClick={() => props.onReplaceAll()}
       >
-        <span
-          className={`${REPLACE_BUTTON_CLASS} ${BUTTON_CONTENT_CLASS}`}
-          tabIndex={-1}
-        >
+        <span className={`${REPLACE_BUTTON_CLASS} ${BUTTON_CONTENT_CLASS}`}>
           {trans.__('Replace All')}
         </span>
-      </button>
+      </Button>
     </div>
   );
 }
@@ -306,33 +301,33 @@ function UpDownButtons(props: IUpDownProps) {
   const nextShortcut = nextKeys ? ` (${nextKeys})` : '';
 
   const upButton = (
-    <button
+    <Button
+      appearance="stealth"
       className={BUTTON_WRAPPER_CLASS}
       onClick={() => (props.isEnabled ? props.onHighlightPrevious() : false)}
-      tabIndex={0}
       title={`${props.trans.__('Previous Match')}${prevShortcut}`}
       disabled={!props.isEnabled}
     >
       <caretUpEmptyThinIcon.react
         className={classes(UP_DOWN_BUTTON_CLASS, BUTTON_CONTENT_CLASS)}
-        tag="span"
+        tag={null}
       />
-    </button>
+    </Button>
   );
 
   const downButton = (
-    <button
+    <Button
+      appearance="stealth"
       className={BUTTON_WRAPPER_CLASS}
       onClick={() => (props.isEnabled ? props.onHighlightNext() : false)}
-      tabIndex={0}
       title={`${props.trans.__('Next Match')}${nextShortcut}`}
       disabled={!props.isEnabled}
     >
       <caretDownEmptyThinIcon.react
         className={classes(UP_DOWN_BUTTON_CLASS, BUTTON_CONTENT_CLASS)}
-        tag="span"
+        tag={null}
       />
-    </button>
+    </Button>
   );
 
   return (
@@ -376,18 +371,18 @@ function FilterToggle(props: IFilterToggleProps): JSX.Element {
   const icon = props.anyEnabled ? filterDotIcon : filterIcon;
 
   return (
-    <button
+    <Button
+      appearance="stealth"
       className={BUTTON_WRAPPER_CLASS}
       onClick={() => props.toggleVisible()}
-      tabIndex={0}
       title={
         props.visible
           ? props.trans.__('Hide Search Filters')
           : props.trans.__('Show Search Filters')
       }
     >
-      <icon.react className={className} tag="span" height="20px" width="20px" />
-    </button>
+      <icon.react className={className} tag={null} height="20px" width="20px" />
+    </Button>
   );
 }
 
@@ -694,10 +689,10 @@ class SearchOverlay extends React.Component<ISearchOverlayProps> {
           {this.props.isReadOnly ? (
             <div className={TOGGLE_PLACEHOLDER} />
           ) : (
-            <button
+            <Button
+              appearance="stealth"
               className={TOGGLE_WRAPPER}
               onClick={() => this._onReplaceToggled()}
-              tabIndex={0}
               title={
                 showReplace
                   ? trans.__('Hide Replace')
@@ -706,12 +701,12 @@ class SearchOverlay extends React.Component<ISearchOverlayProps> {
             >
               <icon.react
                 className={`${REPLACE_TOGGLE_CLASS} ${BUTTON_CONTENT_CLASS}`}
-                tag="span"
+                tag={null}
                 elementPosition="center"
                 height="20px"
                 width="20px"
               />
-            </button>
+            </Button>
           )}
           <SearchEntry
             inputRef={this.props.searchInputRef}
@@ -746,10 +741,10 @@ class SearchOverlay extends React.Component<ISearchOverlayProps> {
             keyBindings={this.props.keyBindings}
             isEnabled={!!this.props.searchInputRef.current?.value}
           />
-          <button
+          <Button
+            appearance="stealth"
             className={BUTTON_WRAPPER_CLASS}
             onClick={() => this._onClose()}
-            tabIndex={0}
             title={trans.__('Close Search Box')}
           >
             <closeIcon.react
@@ -757,8 +752,9 @@ class SearchOverlay extends React.Component<ISearchOverlayProps> {
               elementPosition="center"
               height="16px"
               width="16px"
+              tag={null}
             />
-          </button>
+          </Button>
         </div>
         <div className={OVERLAY_ROW_CLASS}>
           {showReplace ? (

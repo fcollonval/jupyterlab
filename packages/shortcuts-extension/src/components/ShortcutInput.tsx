@@ -4,6 +4,7 @@
  */
 
 import * as React from 'react';
+import { Button } from '@jupyter/react-components';
 import { ITranslator } from '@jupyterlab/translation';
 import { JSONExt } from '@lumino/coreutils';
 import { EN_US } from '@lumino/keyboard';
@@ -390,7 +391,8 @@ export class ShortcutInput extends React.Component<
               : this.state.value}
           </p>
         </div>
-        <button
+        <Button
+          appearance="stealth"
           className={
             !this.state.isFunctional
               ? 'jp-Shortcuts-Submit jp-mod-defunc-Submit'
@@ -402,8 +404,12 @@ export class ShortcutInput extends React.Component<
           disabled={!this.state.isAvailable || !this.state.isFunctional}
           onClick={this.handleSubmit}
         >
-          {this.state.isAvailable ? <checkIcon.react /> : <errorIcon.react />}
-        </button>
+          {this.state.isAvailable ? (
+            <checkIcon.react tag={null} />
+          ) : (
+            <errorIcon.react tag={null} />
+          )}
+        </Button>
       </div>
     );
   }
